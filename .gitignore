@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build output
+frontend/dist/
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/tsconfig.tsbuildinfo
+frontend/tsconfig.node.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+backend/.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local databases (Postgres is the real store; SQLite is dev/test only)
+*.db
+*.sqlite3
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Tooling / OS
+.DS_Store
+.idea/
+.vscode/
