@@ -1,0 +1,22 @@
+# Ruff configuration for the FairSchedule AI backend.
+# Run with: ruff check .   (from backend/ — this is the backend `lint` command,
+# wired into .github/workflows/ci.yml as the "Backend lint" step).
+line-length = 120
+target-version = "py312"
+src = ["app", "tests"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # comprehensions
+    "UP",  # pyupgrade
+]
+ignore = []
+
+[lint.per-file-ignores]
+# Test files may import starred fixtures and use assert plainness.
+"tests/**" = ["B011"]

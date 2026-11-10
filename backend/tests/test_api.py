@@ -1,3 +1,9 @@
+"""Baseline smoke tests, carried over from the pre-loop scaffold.
+
+Assertions are unchanged from the baseline; only line wrapping and import
+order were adjusted to satisfy Ruff.
+"""
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -44,7 +50,11 @@ def test_dashboard_overview_for_logged_in_user():
 def test_generate_schedule_returns_rows():
     login = client.post('/auth/login', json={'email': 'admin@northbridge.edu', 'password': 'demo-admin'})
     token = login.json()['access_token']
-    response = client.post('/schedules/generate', headers={'Authorization': f'Bearer {token}'}, json={'institution_id': 1, 'campus_id': 1})
+    response = client.post(
+        '/schedules/generate',
+        headers={'Authorization': f'Bearer {token}'},
+        json={'institution_id': 1, 'campus_id': 1},
+    )
     assert response.status_code == 200
     body = response.json()
     assert 'schedule' in body
@@ -54,6 +64,10 @@ def test_generate_schedule_returns_rows():
 def test_ai_without_provider_returns_demo_message():
     login = client.post('/auth/login', json={'email': 'faculty@northbridge.edu', 'password': 'demo-faculty'})
     token = login.json()['access_token']
-    response = client.post('/ai/chat', headers={'Authorization': f'Bearer {token}'}, json={'prompt': 'What classes do I have on Monday?'})
+    response = client.post(
+        '/ai/chat',
+        headers={'Authorization': f'Bearer {token}'},
+        json={'prompt': 'What classes do I have on Monday?'},
+    )
     assert response.status_code == 200
     assert 'AI is not configured' in response.json()['answer']
