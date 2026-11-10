@@ -77,7 +77,12 @@ def build_authorize_url(state: str) -> str:
 
 
 def exchange_code_for_identity(code: str) -> dict:
-    """Exchange the authorization code and return ``{'sub', 'email', 'name'}``.
+    """Exchange the authorization code and return the identity claims.
+
+    Returns ``{'sub', 'email', 'name', 'email_verified'}``. The
+    ``email_verified`` claim is mandatory input for account linking: an
+    identity provider that has not verified the address must never be able
+    to take over an existing account (see ``_resolve_sso_user``).
 
     Raises ``httpx.HTTPError`` on any provider failure; callers translate that
     into an API error. Tests monkeypatch this function.
@@ -108,4 +113,9 @@ def exchange_code_for_identity(code: str) -> dict:
     email = claims.get('email')
     if not email:
         raise ValueError('provider returned no email claim')
-    return {'sub': str(claims.get('sub', '')), 'email': email, 'name': claims.get('name') or email}
+    return {
+        'sub': str(claims.get('sub', '')),
+        'email': email,
+        'name': claims.get('name') or email,
+        'email_verified': bool(claims.get('email_verified')),
+    }

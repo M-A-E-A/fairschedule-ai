@@ -121,14 +121,24 @@ def sso_callback(
     )
 
 
-def _resolve_sso_user(session: Session, identity: dict[str, str]) -> User:
+def _resolve_sso_user(session: Session, identity: dict[str, str | bool]) -> User:
     """Link an SSO identity to an existing account or provision a new one.
+
+    An existing account is only ever linked — and a new account only ever
+    provisioned — when the provider asserts the email address is verified
+    (``email_verified`` is true). Without that assertion, an attacker who
+    controls an unverified address at a provider could link to (and
+    therefore authenticate as) any matching account, including
+    administrators: the classic OIDC unverified-email account takeover.
+    Identities already linked by subject are trusted, since that binding was
+    established under the verified-email rule.
 
     Provisioned accounts always receive the unprivileged default role inside
     the configured default institution — SSO can never mint an administrator.
     """
     provider = settings.sso_provider
     email = identity['email'].lower()
+    email_verified = bool(identity.get('email_verified'))
     user = session.exec(
         select(User).where(User.external_subject == identity['sub'], User.external_provider == provider)
     ).first()
@@ -137,12 +147,26 @@ def _resolve_sso_user(session: Session, identity: dict[str, str]) -> User:
 
     user = session.exec(select(User).where(User.email == email)).first()
     if user is not None:
-        # Existing account (any role) opts into SSO by signing in once.
+        if not email_verified:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail='email not verified by provider',
+            )
+        # Existing account (any role) opts into SSO by signing in once —
+        # but only with a provider-verified email address.
         user.external_subject = identity['sub']
         user.external_provider = provider
         session.add(user)
         session.commit()
         return user
+
+    if not email_verified:
+        # Same rule for provisioning: an unverified address must not be able
+        # to create accounts that shadow someone else's email.
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='email not verified by provider',
+        )
 
     institution = session.exec(
         select(Institution).where(Institution.slug == settings.sso_default_institution_slug)
