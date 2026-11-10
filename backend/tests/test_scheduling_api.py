@@ -40,7 +40,7 @@ def test_generate_creates_proposal_with_metrics(client, faculty_headers, generat
 
 def test_generate_does_not_mutate_bookings(client, faculty_headers, admin_headers, generated):
     timetable = client.get('/institutions/1/timetable', headers=admin_headers).json()
-    slots = {(row['day'], row['start_minute']) for row in timetable}
+    slots = {(row['day'], row['start_minute']) for row in timetable['sessions']}
     assert (0, 540) in slots  # seeded CS101 session, unchanged until approval
 
 

@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlmodel import Session, select
 
-from app.api.deps import ensure_tenant, require_roles
+from app.api.deps import require_roles
 from app.core.db import get_session
 from app.core.roles import ADMINISTRATOR, ALL_ROLES
 from app.core.security import hash_password
@@ -176,14 +176,20 @@ def update_user(
     return _user_dict(target)
 
 
+# NOTE: the return annotation is `Response`, not `None`. With
+# `from __future__ import annotations`, FastAPI resolves `-> None` to
+# `NoneType` and treats it as a response model, which is illegal on 204
+# ("Status code 204 must not have a response body"). Returning an explicit
+# bodyless `Response` keeps the 204 contract and has an empty body.
 @router.delete('/admin/users/{user_id}', status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: int,
     current_user: User = Depends(require_roles(ADMINISTRATOR)),
     session: Session = Depends(get_session),
-) -> None:
+) -> Response:
     target = _get_target(session, user_id, current_user)
     if target.id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='cannot delete your own account')
     session.delete(target)
     session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

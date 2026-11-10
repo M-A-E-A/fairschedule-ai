@@ -105,7 +105,9 @@ def sso_callback(
     try:
         identity = sso.exchange_code_for_identity(code)
     except (httpx.HTTPError, ValueError) as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail='identity provider exchange failed') from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail='identity provider exchange failed'
+        ) from exc
 
     user = _resolve_sso_user(session, identity)
     if not user.is_active:

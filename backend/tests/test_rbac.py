@@ -105,5 +105,5 @@ def test_requests_without_token_are_rejected_everywhere(client: TestClient):
         ('post', '/schedules/generate'),
         ('post', '/ai/chat'),
     ):
-        response = getattr(client, method)(path, json={} if method == 'post' else None)
+        response = getattr(client, method)(path, **({'json': {}} if method == 'post' else {}))
         assert response.status_code == 401, f'{method.upper()} {path} -> {response.status_code}'

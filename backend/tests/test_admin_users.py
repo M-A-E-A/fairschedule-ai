@@ -4,7 +4,6 @@ role changes and validation."""
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture(scope='module')
@@ -40,7 +39,7 @@ def test_create_user_201_and_login(client, admin_headers):
 def test_duplicate_username_and_email_rejected(client, admin_headers):
     dup = client.post(
         '/admin/users', headers=admin_headers,
-        json={'username': 'admin', 'email': 'other@northbridge.edu', 'password': 'demo-x', 'role': 'student'},
+        json={'username': 'admin', 'email': 'other@northbridge.edu', 'password': 'demo-sample', 'role': 'student'},
     )
     assert dup.status_code == 409
 
@@ -48,7 +47,7 @@ def test_duplicate_username_and_email_rejected(client, admin_headers):
     # allow the duplicate through.
     dup_email = client.post(
         '/admin/users', headers=admin_headers,
-        json={'username': 'otheruser', 'email': 'admin@northbridge.edu', 'password': 'demo-x', 'role': 'student'},
+        json={'username': 'otheruser', 'email': 'admin@northbridge.edu', 'password': 'demo-sample', 'role': 'student'},
     )
     assert dup_email.status_code == 409
 
@@ -56,7 +55,7 @@ def test_duplicate_username_and_email_rejected(client, admin_headers):
 def test_invalid_role_rejected(client, admin_headers):
     created = client.post(
         '/admin/users', headers=admin_headers,
-        json={'username': 'bogus', 'email': 'bogus@northbridge.edu', 'password': 'demo-x', 'role': 'superuser'},
+        json={'username': 'bogus', 'email': 'bogus@northbridge.edu', 'password': 'demo-sample', 'role': 'superuser'},
     )
     assert created.status_code == 422
 
@@ -66,7 +65,7 @@ def test_foreign_links_rejected(client, admin_headers):
     foreign_group = client.post(
         '/admin/users', headers=admin_headers,
         json={
-            'username': 'spy', 'email': 'spy@northbridge.edu', 'password': 'demo-x', 'role': 'student',
+            'username': 'spy', 'email': 'spy@northbridge.edu', 'password': 'demo-sample', 'role': 'student',
             'student_group_id': 3,  # Engineering Cohort (institution 2)
         },
     )
@@ -75,7 +74,7 @@ def test_foreign_links_rejected(client, admin_headers):
     foreign_lecturer = client.post(
         '/admin/users', headers=admin_headers,
         json={
-            'username': 'spy2', 'email': 'spy2@northbridge.edu', 'password': 'demo-x', 'role': 'faculty',
+            'username': 'spy2', 'email': 'spy2@northbridge.edu', 'password': 'demo-sample', 'role': 'faculty',
             'lecturer_id': 4,  # Milo Stone (institution 2)
         },
     )
@@ -88,7 +87,7 @@ def test_operator_cannot_manage_users(client, module_login):
     assert listing.status_code == 403
 
 
-def test_update_role_and_me_reflects_change(client, admin_headers):
+def test_update_role_and_me_reflects_change(client, admin_headers, module_login):
     users = client.get('/admin/users', headers=admin_headers).json()
     target = next(u for u in users if u['username'] == 'operator')
     updated = client.patch(f"/admin/users/{target['id']}", headers=admin_headers, json={'role': 'administrator'})

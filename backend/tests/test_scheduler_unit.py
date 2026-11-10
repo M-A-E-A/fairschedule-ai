@@ -72,7 +72,7 @@ def test_lecturer_conflict_fixed_slot_is_infeasible_but_movable_solves():
     # pinned the instance is genuinely infeasible.
     sessions = [
         _session(1, lecturer_id=7, group_id=1),
-        _session(2, lecturer_id=7, group_id=2, start=630, room_id=2),
+        _session(2, lecturer_id=7, group_id=2, start=540, room_id=2),
     ]
     rooms = [_room(1), _room(2)]
     fixed = _generate(sessions, rooms, allow_time_change=False)
@@ -88,7 +88,7 @@ def test_lecturer_conflict_fixed_slot_is_infeasible_but_movable_solves():
 def test_student_group_conflict_is_detected():
     sessions = [
         _session(1, group_id=3, lecturer_id=1),
-        _session(2, group_id=3, lecturer_id=2, start=630, room_id=2),
+        _session(2, group_id=3, lecturer_id=2, start=540, room_id=2),
     ]
     rooms = [_room(1), _room(2)]
     fixed = _generate(sessions, rooms, allow_time_change=False)
@@ -102,7 +102,7 @@ def test_student_group_conflict_is_detected():
 def test_room_overlap_fixed_slot_is_infeasible_but_movable_solves():
     sessions = [
         _session(1, lecturer_id=1, group_id=1),
-        _session(2, lecturer_id=2, group_id=2, start=630, room_id=1),
+        _session(2, lecturer_id=2, group_id=2, start=540, room_id=1),
     ]
     rooms = [_room(1)]
     fixed = _generate(sessions, rooms, allow_time_change=False)

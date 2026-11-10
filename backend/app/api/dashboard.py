@@ -64,7 +64,10 @@ def dashboard_overview(
     groups = session.exec(select(StudentGroup).where(StudentGroup.institution_id == institution_id)).all()
     bookings = session.exec(select(SessionBooking).where(SessionBooking.institution_id == institution_id)).all()
     proposals = session.exec(
-        select(ScheduleProposal).where(ScheduleProposal.institution_id == institution_id, ScheduleProposal.approved == False)  # noqa: E712
+        select(ScheduleProposal).where(
+            ScheduleProposal.institution_id == institution_id,
+            ScheduleProposal.approved == False,  # noqa: E712
+        )
     ).all()
     return {
         'institution_id': institution_id,

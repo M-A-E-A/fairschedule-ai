@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlmodel import Session, select
 
 from app.api.deps import ensure_tenant, get_current_user, require_roles
@@ -101,7 +101,7 @@ def delete_room(
     room_id: int,
     current_user: User = Depends(require_roles(*ROOM_MANAGERS)),
     session: Session = Depends(get_session),
-) -> None:
+) -> Response:
     room = _get_room(session, room_id, current_user)
     bookings = session.exec(select(SessionBooking).where(SessionBooking.room_id == room_id)).all()
     if bookings:
@@ -111,3 +111,4 @@ def delete_room(
         )
     session.delete(room)
     session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

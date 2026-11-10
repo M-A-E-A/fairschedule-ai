@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8', extra='ignore')
 
     @model_validator(mode='after')
-    def ensure_jwt_secret(self) -> 'Settings':
+    def ensure_jwt_secret(self) -> Settings:
         if not self.jwt_secret:
             if self.app_env == 'production':
                 raise ValueError('JWT_SECRET must be set when APP_ENV=production')

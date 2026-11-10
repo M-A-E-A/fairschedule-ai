@@ -19,8 +19,20 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.core.config import get_settings  # noqa: E402
-from app.models import AuditEvent, Building, Campus, Course, Department, Institution, Lecturer, Room  # noqa: E402, F401
-from app.models import ScheduleProposal, SessionBooking, StudentGroup, User  # noqa: E402, F401
+from app.models import (  # noqa: E402, F401  # noqa: E402, F401
+    AuditEvent,
+    Building,
+    Campus,
+    Course,
+    Department,
+    Institution,
+    Lecturer,
+    Room,
+    ScheduleProposal,
+    SessionBooking,
+    StudentGroup,
+    User,
+)
 
 config = context.config
 
@@ -51,7 +63,9 @@ def run_migrations_online() -> None:
 
     connectable = create_engine(_database_url())
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=True, compare_type=True)
+        context.configure(
+            connection=connection, target_metadata=target_metadata, render_as_batch=True, compare_type=True
+        )
         with context.begin_transaction():
             context.run_migrations()
 

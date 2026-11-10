@@ -124,7 +124,10 @@ def _slot_options(
 def _overlaps(busy: list | None, day: int, start: int, end: int) -> bool:
     if not busy:
         return False
-    return any(other_day == day and start < other_end and other_start < end for other_day, other_start, other_end in busy)
+    return any(
+        other_day == day and start < other_end and other_start < end
+        for other_day, other_start, other_end in busy
+    )
 
 
 def _greedy_assignment(
@@ -440,7 +443,8 @@ def find_booking_conflicts(candidate: dict, existing: list[dict]) -> list[str]:
     """Return the kinds of hard conflict ``candidate`` would create.
 
     Used to reject overlapping room/lecturer/group bookings at write time,
-    so violations never reach the database.
+    so violations never reach the database. Kinds are ``room_conflict``,
+    ``lecturer_conflict`` and ``group_conflict``.
     """
     start = candidate['start_minute']
     end = start + candidate['duration_minute']
@@ -455,9 +459,9 @@ def find_booking_conflicts(candidate: dict, existing: list[dict]) -> list[str]:
         if not (start < other_end and other_start < end):
             continue
         if other['room_id'] == candidate['room_id']:
-            conflicts.add('room')
+            conflicts.add('room_conflict')
         if other['lecturer_id'] == candidate['lecturer_id']:
-            conflicts.add('lecturer')
+            conflicts.add('lecturer_conflict')
         if other['student_group_id'] == candidate['student_group_id']:
-            conflicts.add('student_group')
+            conflicts.add('group_conflict')
     return sorted(conflicts)

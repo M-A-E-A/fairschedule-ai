@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlmodel import Session, select
 
 from app.api.deps import ensure_tenant, get_current_user, require_roles
@@ -21,6 +21,14 @@ from app.schemas.scheduling import BookingCreateRequest, BookingUpdateRequest
 from app.services.scheduler import find_booking_conflicts
 
 router = APIRouter(tags=['bookings'])
+
+# Human-readable words for the conflict kinds returned by
+# ``find_booking_conflicts`` so error details stay readable.
+_CONFLICT_LABELS = {
+    'room_conflict': 'room',
+    'lecturer_conflict': 'lecturer',
+    'group_conflict': 'student_group',
+}
 
 
 def _tenant_resource(session: Session, model, resource_id: int, institution_id: int, label: str):
@@ -70,7 +78,8 @@ def _validate_hard_constraints(
     if conflicts:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail='conflicting ' + ', '.join(conflicts) + ' booking at that time',
+            detail='conflicting ' + ', '.join(_CONFLICT_LABELS[kind] for kind in conflicts)
+            + ' booking at that time',
         )
 
 
@@ -174,7 +183,8 @@ def delete_booking(
     booking_id: int,
     current_user: User = Depends(require_roles(*RESOURCE_MANAGERS)),
     session: Session = Depends(get_session),
-) -> None:
+) -> Response:
     booking = _get_booking(session, booking_id, current_user)
     session.delete(booking)
     session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

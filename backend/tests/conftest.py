@@ -22,9 +22,8 @@ if _TEST_DB.exists():
     _TEST_DB.unlink()
 
 import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-
 from app.main import app  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture(scope='session')
@@ -35,9 +34,13 @@ def lifespan_client() -> TestClient:
 
 
 @pytest.fixture(scope='module')
-def module_login(client: TestClient):
-    """Module-scoped token helper: cheap, but scoped so tests stay isolated."""
-    def _login(username: str, password: str | None = None) -> dict[str, str]:
+def module_login():
+    """Module-scoped token helper: cheap, but scoped so tests stay isolated.
+
+    Signature is ``module_login(client, username, password=None)`` to match
+    how every test module calls it.
+    """
+    def _login(client: TestClient, username: str, password: str | None = None) -> dict[str, str]:
         return auth_headers(client, username, password or f'demo-{username}')
     return _login
 

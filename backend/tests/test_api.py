@@ -4,9 +4,8 @@ Assertions are unchanged from the baseline; only line wrapping and import
 order were adjusted to satisfy Ruff.
 """
 
-from fastapi.testclient import TestClient
-
 from app.main import app
+from fastapi.testclient import TestClient
 
 client = TestClient(app)
 

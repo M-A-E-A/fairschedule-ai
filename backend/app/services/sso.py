@@ -11,12 +11,11 @@ monkeypatched in tests so no test ever touches the network.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
-from jose import JWTError, jwt
-
 from app.core.config import get_settings
+from jose import JWTError, jwt
 
 STATE_PURPOSE = 'sso_state'
 STATE_EXPIRE_MINUTES = 10
@@ -41,7 +40,7 @@ def frontend_login_url(fragment: str) -> str:
 
 def create_state_token(nonce: str) -> str:
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         'purpose': STATE_PURPOSE,
         'nonce': nonce,

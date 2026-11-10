@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -29,7 +29,7 @@ def create_access_token(user_id: int, role: str, institution_id: int) -> str:
     ``sub`` is the immutable user id (not the email or username, which can
     change), so revocation-sensitive lookups always resolve to one row.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         'sub': str(user_id),
         'role': role,

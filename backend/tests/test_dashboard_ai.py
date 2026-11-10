@@ -32,10 +32,10 @@ def test_overview_is_scoped_to_own_tenant(client, admin_headers, module_login):
     assert north['courses'] == 3
     assert north['sessions'] == 3
 
-    harbor_headers = module_login(client, 'harbor-admin')
+    harbor_headers = module_login(client, 'harbor-admin', 'demo-admin-harbor')
     harbor = client.get('/dashboard/overview', headers=harbor_headers).json()
     assert harbor['institution_id'] == 2
-    assert harbor['institution_name'] == 'Harbor Institute'
+    assert harbor['institution_name'] == 'Harbor College'
     assert harbor['rooms'] == 1
     assert harbor['sessions'] == 1
     # The Harbor dashboard never mentions Northbridge data.
@@ -98,7 +98,9 @@ def test_campuses_are_listed_per_tenant(client, admin_headers, module_login):
     assert by_slug['main']['room_count'] == 3  # A101, B204, C315
     assert by_slug['tech-park']['room_count'] == 1  # T12
 
-    harbor_campuses = client.get('/institutions/2/campuses', headers=module_login(client, 'harbor-admin')).json()
+    harbor_campuses = client.get(
+        '/institutions/2/campuses', headers=module_login(client, 'harbor-admin', 'demo-admin-harbor')
+    ).json()
     assert len(harbor_campuses) == 1
     assert harbor_campuses[0]['slug'] == 'harbor-south'
 
@@ -124,7 +126,9 @@ def test_faculty_ai_answer_is_teaching_scoped(client, faculty_headers):
 
 
 def test_admin_ai_answer_is_institution_scoped(client, admin_headers):
-    answer = client.post('/ai/chat', headers=admin_headers, json={'prompt': 'Summarise the institution.'}).json()['answer']
+    answer = client.post(
+        '/ai/chat', headers=admin_headers, json={'prompt': 'Summarise the institution.'}
+    ).json()['answer']
     assert 'Northbridge' in answer
     assert 'Harbor' not in answer
     assert 'AI is not configured' in answer

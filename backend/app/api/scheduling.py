@@ -14,13 +14,12 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
-from app.api.deps import ensure_tenant, get_current_user, require_roles
+from app.api.deps import ensure_tenant, require_roles
 from app.core.db import get_session
 from app.core.roles import PROPOSAL_APPROVERS, SCHEDULE_MANAGERS
 from app.models import (
     AuditEvent,
     Course,
-    Lecturer,
     Room,
     ScheduleProposal,
     SessionBooking,

@@ -13,7 +13,7 @@ class LoginRequest(BaseModel):
     password: str
 
     @model_validator(mode='after')
-    def require_identifier(self) -> 'LoginRequest':
+    def require_identifier(self) -> LoginRequest:
         if not self.username and not self.email:
             raise ValueError('either username or email is required')
         return self
@@ -51,7 +51,7 @@ class SsoConfigResponse(BaseModel):
 class CreateUserRequest(BaseModel):
     username: str = Field(min_length=3, max_length=64, pattern=r'^[A-Za-z0-9._-]+$')
     email: EmailStr
-    full_name: str = Field(min_length=1, max_length=120)
+    full_name: str = Field(default='', max_length=120)
     role: str
     password: str = Field(min_length=8, max_length=128)
     student_group_id: int | None = None

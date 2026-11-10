@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 def _ids(client: TestClient, headers: dict[str, str]) -> dict:
     rooms = {room['name']: room['id'] for room in client.get('/institutions/1/rooms', headers=headers).json()}
     courses = {c['code']: c['id'] for c in client.get('/institutions/1/courses', headers=headers).json()}
-    lecturers = {l['name']: l['id'] for l in client.get('/institutions/1/lecturers', headers=headers).json()}
+    lecturers = {row['name']: row['id'] for row in client.get('/institutions/1/lecturers', headers=headers).json()}
     groups = {g['name']: g['id'] for g in client.get('/institutions/1/student-groups', headers=headers).json()}
     campuses = {c['slug']: c['id'] for c in client.get('/institutions/1/campuses', headers=headers).json()}
     return {'rooms': rooms, 'courses': courses, 'lecturers': lecturers, 'groups': groups, 'campuses': campuses}
@@ -65,8 +65,10 @@ def test_faculty_can_create_bookings_and_students_cannot(
     assert created.status_code == 201, created.text
     booking_id = created.json()['id']
 
-    # Same cohort, overlapping time in another room -> student-group clash.
-    clash = dict(payload, room_id=ids['rooms']['T12'], start_minute=720)
+    # Same cohort, overlapping time in another main-campus room -> clash.
+    # A101 is on the main campus (T12 is on Tech Park), seats the cohort and
+    # satisfies the room type, so the write reaches the conflict check.
+    clash = dict(payload, room_id=ids['rooms']['A101'], start_minute=720)
     conflict = client.post('/institutions/1/bookings', headers=faculty_headers, json=clash)
     assert conflict.status_code == 409
     assert 'student_group' in conflict.json()['detail']
@@ -180,7 +182,7 @@ def test_booking_update_and_delete(client: TestClient, faculty_headers, admin_he
             'course_id': ids['courses']['CS101'],
             'lecturer_id': ids['lecturers']['Ada Reed'],
             'student_group_id': ids['groups']['CS Year 2'],
-            'room_id': ids['rooms']['T12'],
+            'room_id': ids['rooms']['A101'],
             'day': 4,
             'start_minute': 540,
             'duration_minute': 90,
@@ -193,8 +195,9 @@ def test_booking_update_and_delete(client: TestClient, faculty_headers, admin_he
     assert updated.status_code == 200
     assert updated.json()['start_minute'] == 660
 
-    # Moving onto a conflicting slot must be refused by re-validation.
-    clash = client.patch(f'/bookings/{booking_id}', headers=faculty_headers, json={'start_minute': 540})
+    # Moving onto a slot a seeded booking already occupies (Monday 09:00 in
+    # A101, Ada Reed) must be refused by re-validation.
+    clash = client.patch(f'/bookings/{booking_id}', headers=faculty_headers, json={'day': 0, 'start_minute': 540})
     assert clash.status_code == 409
 
     assert client.delete(f'/bookings/{booking_id}', headers=faculty_headers).status_code == 204

@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from jose import jwt
-
 from app.core.config import get_settings
 from app.services import sso
+from jose import jwt
 
 
 @pytest.fixture
@@ -119,14 +118,12 @@ def test_provisioning_is_audited(client, sso_enabled, monkeypatch):
     state = sso.create_state_token(nonce='n')
     client.get(f'/auth/sso/callback?code=auth-code&state={state}', follow_redirects=False)
 
-    events = client.get('/auth/me', headers={
-        'Authorization': f"Bearer {client.post('/auth/login', json={'username': 'admin', 'password': 'demo-admin'}).json()['access_token']}"
-    })
+    admin_login = client.post('/auth/login', json={'username': 'admin', 'password': 'demo-admin'})
+    admin = {'Authorization': f"Bearer {admin_login.json()['access_token']}"}
+    events = client.get('/auth/me', headers=admin)
     assert events.status_code == 200
     # Audit trail is admin-only, and the provisioning event exists.
-    audit = client.get('/audit-events', headers={
-        'Authorization': f"Bearer {client.post('/auth/login', json={'username': 'admin', 'password': 'demo-admin'}).json()['access_token']}"
-    }).json()
+    audit = client.get('/audit-events', headers=admin).json()
     assert any(event['event_type'] == 'sso_provisioned' for event in audit)
 
 

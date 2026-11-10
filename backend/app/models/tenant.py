@@ -6,20 +6,18 @@ so that tenant isolation can be enforced in every query.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from sqlmodel import Field, SQLModel
 
 
 class Institution(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     name: str
     slug: str = Field(index=True, unique=True)
     tenant_code: str
 
 
 class Campus(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     name: str
     slug: str
@@ -29,19 +27,19 @@ class Campus(SQLModel, table=True):
 
 
 class Department(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     name: str
 
 
 class Building(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     campus_id: int = Field(foreign_key='campus.id', index=True)
     name: str
 
 
 class Room(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     campus_id: int = Field(foreign_key='campus.id', index=True)
     name: str
@@ -51,14 +49,14 @@ class Room(SQLModel, table=True):
 
 
 class Lecturer(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     name: str
     email: str
 
 
 class StudentGroup(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     name: str
     # Head count; the solver refuses rooms that cannot seat the group.
@@ -66,7 +64,7 @@ class StudentGroup(SQLModel, table=True):
 
 
 class Course(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     code: str
     name: str
@@ -75,7 +73,7 @@ class Course(SQLModel, table=True):
 
 
 class User(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     # App-managed username used for password sign-in; unique per deployment.
     username: str = Field(index=True, unique=True)
     email: str = Field(index=True, unique=True)
@@ -85,15 +83,15 @@ class User(SQLModel, table=True):
     institution_id: int = Field(foreign_key='institution.id', index=True)
     is_active: bool = True
     # Set when the account was linked to an external identity provider.
-    external_subject: Optional[str] = Field(default=None, index=True)
+    external_subject: str | None = Field(default=None, index=True)
     external_provider: str = ''
     # Role-specific links used for "my schedule" views.
-    student_group_id: Optional[int] = Field(default=None, foreign_key='studentgroup.id')
-    lecturer_id: Optional[int] = Field(default=None, foreign_key='lecturer.id')
+    student_group_id: int | None = Field(default=None, foreign_key='studentgroup.id')
+    lecturer_id: int | None = Field(default=None, foreign_key='lecturer.id')
 
 
 class SessionBooking(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     campus_id: int = Field(foreign_key='campus.id', index=True)
     course_id: int = Field(foreign_key='course.id', index=True)
@@ -107,7 +105,7 @@ class SessionBooking(SQLModel, table=True):
 
 
 class ScheduleProposal(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     campus_id: int = Field(foreign_key='campus.id', default=0)
     owner_email: str
@@ -117,7 +115,7 @@ class ScheduleProposal(SQLModel, table=True):
 
 
 class AuditEvent(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     institution_id: int = Field(foreign_key='institution.id', index=True)
     user_email: str
     event_type: str
