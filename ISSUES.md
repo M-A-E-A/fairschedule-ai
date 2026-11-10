@@ -26,6 +26,20 @@ Protocol: [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).
 | ID | Title | Raised in | Status | Resolution / justification |
 |----|-------|-----------|--------|-----------------------------|
 | B-001 | Baseline scaffold present before round 1 | baseline | resolved | Superseded by round 1 delivery; retained for provenance only. Not a review finding. |
+| R-001 | Proposal approval skips backend revalidation (PROJECT.md) | round 1 (review) | open | `approve_proposal` applies stale solver rows without re-checking hard constraints against current data. |
+| R-002 | SSO links existing accounts by email without `email_verified` | round 1 (review) | open | Unverified-email IdP allows takeover of any matching account, including administrators. |
+| R-003 | Room capacity/room_type edits don't revalidate existing bookings | round 1 (review) | open | Shrinking a room or changing its type can leave stored bookings violating hard constraints. |
+| R-004 | Compose CORS allowlist uses container hostname, not browser origin | round 1 (review) | open | `http://frontend:5173` never matches the browser `Origin`, so Compose API calls fail preflight. |
+| R-005 | Compose ships fixed committed JWT secret `change-me` | round 1 (review) | open | Contradicts config design; repo holders can forge tokens for default deployments. |
+| R-006 | Unscoped lookups load every tenant's rows per request | round 1 (review) | open | `select(Course/Lecturer/StudentGroup/Room)` without institution filter in dashboard, scheduling, ai. |
+| R-007 | `/me/schedule` and AI scope branch on lecturer link, not role | round 1 (review) | open | Contradicts documented scoping; dead branch in `_faculty_context`. |
+| R-008 | `POST /ai/chat` accepts untyped dict body | round 1 (review) | open | No Pydantic schema, no OpenAPI validation; inconsistent with the rest of the API. |
+| R-009 | Compose stack never executed; frontend container is dev server | round 1 (review) | open | Static verification only; `npm run dev` in the image, no production build. |
+| R-010 | `.env.example` documents unread `USE_SQLITE_FOR_TESTS` | round 1 (review) | open | Misleading configuration surface; nothing reads the variable. |
+| R-011 | README/login demo docs inaccurate | round 1 (review) | open | Wrong default DB filename; seeded `harbor-admin` tenant undocumented. |
+| R-012 | `@react-three/drei` declared but never imported | round 1 (review) | open | Dead dependency inflating install and bundle size. |
+| R-013 | Frontend tree reports 18 known vulnerabilities | round 1 (review) | open | Visible in CI `npm ci` (2 critical, 1 high, 15 moderate); no audit gate. |
+| R-014 | No rate limiting on login; enumeration timing side channel | round 1 (review) | open | Unlimited guessing plus response-time oracle for account existence. |
 
 ## Round log
 
@@ -81,4 +95,14 @@ tenant-leaking endpoint, a stubbed SSO path, and no `frontend/Dockerfile` despit
     `docker-compose.yml` was verified statically only (existence of both
     Dockerfiles, `build: ./frontend`, port/`VITE_API_BASE_URL` wiring, YAML
     parse). No push blocker occurred; the workflow file was not modified.
-- **Reviewer:** pending.
+- **Reviewer:** audited `8bf412b83a7c4f655b31c68d66b8b7475933eca4` statically — every tracked
+  file — plus the full CI log of run `42780593038` (which checked out this exact SHA). All
+  checks pass and local/CI agree exactly (96 backend tests, Ruff clean, 12 files/31
+  frontend tests, build green with identical asset hashes), so there are **no blocking
+  issues**; verdict is **REJECT** with 14 open findings (R-001 … R-014), the most
+  substantial being: proposal approval skipping the backend revalidation PROJECT.md
+  requires (R-001), SSO account linking on unverified emails (R-002), room edits that
+  can break stored bookings' hard constraints (R-003), and a Compose stack whose CORS
+  allowlist and dev-server frontend mean it has never actually worked (R-004, R-009).
+  Prior issue B-001 verified resolved. Full detail:
+  [`docs/rounds/round-01-review.md`](docs/rounds/round-01-review.md).
