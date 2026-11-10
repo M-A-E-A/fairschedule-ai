@@ -1,5 +1,11 @@
 """Room CRUD. Reads are open to every role of the tenant; mutations require
-campus-operator or administrator role."""
+campus-operator or administrator role.
+
+Room edits never invalidate existing bookings: capacity, room type, and
+campus changes are revalidated against every booking that references the
+room, so the hard constraints that ``bookings.py`` enforces at write time
+cannot be broken afterwards through this API.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +17,7 @@ from sqlmodel import Session, select
 from app.api.deps import ensure_tenant, get_current_user, require_roles
 from app.core.db import get_session
 from app.core.roles import ROOM_MANAGERS
-from app.models import Campus, Room, SessionBooking, User
+from app.models import Campus, Course, Room, SessionBooking, StudentGroup, User
 from app.schemas.scheduling import RoomCreateRequest, RoomUpdateRequest
 
 router = APIRouter(tags=['rooms'])
@@ -73,6 +79,52 @@ def create_room(
     return _room_dict(room)
 
 
+def _validate_room_change(session: Session, room: Room, changes: dict[str, Any]) -> None:
+    """Refuse edits that would leave existing bookings violating constraints.
+
+    The capacity and room-type hard constraints are enforced at booking-write
+    time; a room edit is the other path by which they could be broken, so it
+    is revalidated against every booking that references the room. The
+    documented policy is to reject with 409 and name the offending booking —
+    the operator must move or reassign those sessions first.
+    """
+    bookings = session.exec(select(SessionBooking).where(SessionBooking.room_id == room.id)).all()
+    if not bookings:
+        return
+    course_by_id = {
+        row.id: row for row in session.exec(select(Course).where(Course.institution_id == room.institution_id)).all()
+    }
+    group_by_id = {
+        row.id: row
+        for row in session.exec(select(StudentGroup).where(StudentGroup.institution_id == room.institution_id)).all()
+    }
+    for booking in bookings:
+        if 'campus_id' in changes and changes['campus_id'] != room.campus_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"room is referenced by booking {booking.id} on its current campus; "
+                'move those sessions first',
+            )
+        if 'capacity' in changes:
+            group = group_by_id.get(booking.student_group_id)
+            needed = group.size if group else 0
+            if changes['capacity'] < needed:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f'capacity violated: {room.name} would seat {changes["capacity"]}, '
+                    f'but booking {booking.id} needs {needed} seats',
+                )
+        if 'room_type' in changes:
+            course = course_by_id.get(booking.course_id)
+            required = course.required_room_type if course else 'any'
+            if required not in ('any', '', None) and changes['room_type'] != required:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f'room type violated: booking {booking.id} requires {required}, '
+                    f'{room.name} would become {changes["room_type"]}',
+                )
+
+
 @router.patch('/rooms/{room_id}')
 def update_room(
     room_id: int,
@@ -88,6 +140,8 @@ def update_room(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail='campus does not belong to this institution'
             )
+    if {'capacity', 'room_type', 'campus_id'} & changes.keys():
+        _validate_room_change(session, room, changes)
     for field, value in changes.items():
         setattr(room, field, value)
     session.add(room)

@@ -212,3 +212,69 @@ def test_room_delete_blocked_while_booked(client: TestClient, admin_headers):
     assert any(room['id'] == booked_room_id for room in rooms)
     response = client.delete(f'/rooms/{booked_room_id}', headers=admin_headers)
     assert response.status_code == 409
+
+
+def test_room_edit_never_invalidates_existing_bookings(client: TestClient, admin_headers, faculty_headers):
+    """R-003: capacity/room-type/campus edits are revalidated against the
+    room's bookings, so a room change cannot leave stored sessions violating
+    the hard constraints that bookings.py enforces at write time."""
+    ids = _ids(client, admin_headers)
+    created_room = client.post(
+        '/institutions/1/rooms',
+        headers=admin_headers,
+        json={'campus_id': ids['campuses']['main'], 'name': 'R-LAB', 'capacity': 50, 'room_type': 'lab'},
+    )
+    assert created_room.status_code == 201, created_room.text
+    room_id = created_room.json()['id']
+
+    # DBS201 requires a lab; CS Year 2 has 40 students, so the room fits both.
+    booking = client.post(
+        '/institutions/1/bookings',
+        headers=faculty_headers,
+        json={
+            'campus_id': ids['campuses']['main'],
+            'course_id': ids['courses']['DBS201'],
+            'lecturer_id': ids['lecturers']['Sam Chen'],
+            'student_group_id': ids['groups']['CS Year 2'],
+            'room_id': room_id,
+            'day': 2,
+            'start_minute': 540,
+            'duration_minute': 60,
+        },
+    )
+    assert booking.status_code == 201, booking.text
+    booking_id = booking.json()['id']
+
+    # Shrinking below the cohort's size must be refused.
+    shrink = client.patch(f'/rooms/{room_id}', headers=admin_headers, json={'capacity': 39})
+    assert shrink.status_code == 409, shrink.text
+    assert 'capacity violated' in shrink.json()['detail']
+    assert '39' in shrink.json()['detail']
+
+    # Changing the type away from the course's requirement must be refused.
+    retype = client.patch(f'/rooms/{room_id}', headers=admin_headers, json={'room_type': 'lecture'})
+    assert retype.status_code == 409, retype.text
+    assert 'room type violated' in retype.json()['detail']
+
+    # Moving the room to another campus would strand the booking's campus
+    # (bookings may only reference rooms on their own campus).
+    move = client.patch(
+        f'/rooms/{room_id}', headers=admin_headers, json={'campus_id': ids['campuses']['tech-park']}
+    )
+    assert move.status_code == 409, move.text
+    assert 'current campus' in move.json()['detail']
+
+    # Growing the room and editing free-form fields stay allowed.
+    grow = client.patch(f'/rooms/{room_id}', headers=admin_headers, json={'capacity': 60, 'equipment': 'bench'})
+    assert grow.status_code == 200, grow.text
+    assert grow.json()['capacity'] == 60
+    assert grow.json()['equipment'] == 'bench'
+
+    # Once no booking references the room, the strict edits are allowed again.
+    assert client.delete(f'/bookings/{booking_id}', headers=faculty_headers).status_code == 204
+    after = client.patch(
+        f'/rooms/{room_id}', headers=admin_headers, json={'capacity': 10, 'room_type': 'lecture'}
+    )
+    assert after.status_code == 200, after.text
+
+    assert client.delete(f'/rooms/{room_id}', headers=admin_headers).status_code == 204
