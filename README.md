@@ -31,7 +31,7 @@ alembic upgrade head           # create the schema (Alembic migrations)
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-`DATABASE_URL` defaults to SQLite (`fairschedule.db`) for local runs; set it to a
+`DATABASE_URL` defaults to SQLite (`sqlite:///./demo.db`) for local runs; set it to a
 PostgreSQL URL when using the Compose `db` service. After editing models, create a
 migration with `alembic revision --autogenerate -m "describe change"` and re-run
 `alembic upgrade head`.
@@ -44,11 +44,17 @@ npm install
 npm run dev -- --host 0.0.0.0
 ```
 
-Or with Docker Compose (Postgres + backend + frontend):
+Or with Docker Compose (Postgres + backend + production-built frontend served by
+nginx on http://localhost:5173):
 
 ```bash
 docker compose up --build
 ```
+
+The frontend image is a multi-stage build (`npm run build`, then nginx serving
+the static bundle with SPA fallback routing); the backend runs against the
+Compose Postgres service. The backend generates an ephemeral JWT secret per
+process (`APP_ENV=development`), so no secret is committed for the stack.
 
 ## Demo credentials
 
@@ -59,6 +65,12 @@ address (toggle the tabs), using these development-only accounts:
 - operator (username `operator`) or operator@northbridge.edu / demo-operator
 - faculty (username `faculty`) or faculty@northbridge.edu / demo-faculty
 - student (username `student`) or student@northbridge.edu / demo-student
+
+A second seeded tenant demonstrates the multi-tenant isolation:
+
+- harbor-admin (username `harbor-admin`) or admin@harbor.edu / demo-admin-harbor
+  — administrator of **Harbor College**, a separate institution whose rooms,
+  courses, and timetable are invisible to the Northbridge accounts above.
 
 These are development-only accounts.
 

@@ -129,7 +129,9 @@ export default function LoginPage() {
           </p>
         )}
         <p className="hint">
-          Demo accounts: admin / operator / faculty / student (password <code>demo-&lt;username&gt;</code>).
+          Demo accounts: admin / operator / faculty / student (Northbridge University, password{' '}
+          <code>demo-&lt;username&gt;</code>) · harbor-admin (Harbor College, password{' '}
+          <code>demo-admin-harbor</code>).
         </p>
       </form>
     </div>

@@ -1,0 +1,8 @@
+# Keep the build context small: the virtualenv, caches, and local SQLite
+# files are never needed inside the image.
+.venv
+__pycache__
+*.pyc
+*.db
+.pytest_cache
+.ruff_cache

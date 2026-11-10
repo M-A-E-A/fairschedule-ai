@@ -1,3 +1,6 @@
+# Keep the build context small and Linux-clean: host node_modules (Windows
+# binaries on some machines) must never shadow the `npm ci` layer, and dist
+# is rebuilt inside the image.
 node_modules
 dist
-*.tsbuildinfo
+*.log

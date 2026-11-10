@@ -18,20 +18,27 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fairschedule
       APP_ENV: development
-      JWT_SECRET: change-me
-      BACKEND_CORS_ORIGINS: http://frontend:5173
+      # The browser's Origin header on cross-origin API calls from the
+      # published frontend (http://localhost:5173). "frontend" is a name on
+      # the Docker network only — no browser ever sends it.
+      BACKEND_CORS_ORIGINS: http://localhost:5173
       AI_PROVIDER: none
+      # No JWT_SECRET here: with APP_ENV=development the backend generates an
+      # ephemeral per-process secret, so no secret value ships in the repo.
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # Vite bakes VITE_* variables into the bundle at build time, so the API
+      # base URL must be a build argument, not a runtime environment variable.
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
     depends_on:
       - backend
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
     ports:
       - "5173:5173"
 

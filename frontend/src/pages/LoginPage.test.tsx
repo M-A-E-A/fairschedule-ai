@@ -113,6 +113,20 @@ describe('LoginPage sign-in methods', () => {
     expect(await screen.findByTestId('session-1')).toBeInTheDocument();
   });
 
+  it('lists the demo accounts for both seeded tenants', async () => {
+    stubFetch({ '/auth/sso/config': SSO_OFF });
+    renderApp('/login');
+
+    const hint = await screen.findByText(/Demo accounts:/i);
+    // R-011: the second seeded tenant (Harbor College) must be discoverable
+    // from the login page, including its different demo password.
+    expect(hint).toHaveTextContent('admin / operator / faculty / student');
+    expect(hint).toHaveTextContent('Northbridge University');
+    expect(hint).toHaveTextContent('harbor-admin');
+    expect(hint).toHaveTextContent('Harbor College');
+    expect(hint).toHaveTextContent('demo-admin-harbor');
+  });
+
   it('offers single sign-on when the backend reports it enabled', async () => {
     stubFetch({
       '/auth/sso/config': {
