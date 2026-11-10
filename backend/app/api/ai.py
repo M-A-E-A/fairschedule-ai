@@ -11,16 +11,15 @@ the authorized dataset, so the endpoint stays useful and testable offline.
 
 from __future__ import annotations
 
-from typing import Any
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.core.db import get_session
-from app.core.roles import STUDENT
+from app.core.roles import FACULTY, STUDENT
 from app.models import Course, Institution, Lecturer, Room, ScheduleProposal, SessionBooking, StudentGroup, User
+from app.schemas.ai import AiChatRequest
 
 router = APIRouter(tags=['ai'])
 settings = get_settings()
@@ -43,8 +42,12 @@ def _student_context(user: User, session: Session) -> str:
     ).all()
     if not bookings:
         return 'Your cohort has no scheduled sessions yet.'
-    course_by_id = {row.id: row for row in session.exec(select(Course)).all()}
-    room_by_id = {row.id: row for row in session.exec(select(Room)).all()}
+    course_by_id = {
+        row.id: row for row in session.exec(select(Course).where(Course.institution_id == user.institution_id)).all()
+    }
+    room_by_id = {
+        row.id: row for row in session.exec(select(Room).where(Room.institution_id == user.institution_id)).all()
+    }
     group = session.get(StudentGroup, user.student_group_id)
     lines = [f'Your cohort ({group.name if group else "your group"}) has {len(bookings)} session(s):']
     for booking in sorted(bookings, key=lambda item: (item.day, item.start_minute)):
@@ -70,7 +73,9 @@ def _faculty_context(user: User, session: Session) -> str:
     ).all()
     if not bookings:
         return 'You have no scheduled teaching sessions.'
-    course_by_id = {row.id: row for row in session.exec(select(Course)).all()}
+    course_by_id = {
+        row.id: row for row in session.exec(select(Course).where(Course.institution_id == user.institution_id)).all()
+    }
     lines = [f'You teach {len(bookings)} scheduled session(s):']
     for booking in sorted(bookings, key=lambda item: (item.day, item.start_minute)):
         course = course_by_id.get(booking.course_id)
@@ -105,17 +110,19 @@ def _staff_context(user: User, session: Session) -> str:
 
 @router.post('/ai/chat')
 def ai_chat(
-    payload: dict[str, Any],
+    payload: AiChatRequest,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> dict[str, str]:
-    prompt = (payload.get('prompt') or '').strip()
-    if not prompt:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='prompt required')
+    prompt = payload.prompt
 
     if current_user.role == STUDENT:
         context = _student_context(current_user, session)
-    elif current_user.lecturer_id is not None:
+    elif current_user.role == FACULTY:
+        # Faculty/schedulers see their own teaching; _faculty_context answers
+        # explicitly when the account has no lecturer link. Staff roles
+        # (campus operators, administrators) get the institution overview
+        # regardless of any lecturer link on their account.
         context = _faculty_context(current_user, session)
     else:
         context = _staff_context(current_user, session)

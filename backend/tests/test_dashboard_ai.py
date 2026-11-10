@@ -77,6 +77,56 @@ def test_operator_me_schedule_is_institution_scoped(client, operator_headers):
     assert len(body['sessions']) == 3
 
 
+def test_me_schedule_scopes_on_role_not_lecturer_link(client, admin_headers, module_login):
+    """R-007: an administrator with a lecturer link still gets the institution
+    view, and a faculty user without a link gets an explicit note — never the
+    staff-level institution overview."""
+    users = client.get('/admin/users', headers=admin_headers).json()
+    admin_id = next(user['id'] for user in users if user['username'] == 'admin')
+    ada = next(
+        row['id'] for row in client.get('/institutions/1/lecturers', headers=admin_headers).json()
+        if row['name'] == 'Ada Reed'
+    )
+
+    # Give the administrator a lecturer link (a mixed role/link account).
+    linked = client.patch(f'/admin/users/{admin_id}', headers=admin_headers, json={'lecturer_id': ada})
+    assert linked.status_code == 200, linked.text
+    body = client.get('/me/schedule', headers=admin_headers).json()
+    assert body['scope'] == 'institution'
+    assert len(body['sessions']) == 3  # the whole institution, not Ada's teaching only
+    assert body['note'] == ''
+
+    # A faculty account with no lecturer link is told so, explicitly.
+    unlinked = client.post(
+        '/admin/users',
+        headers=admin_headers,
+        json={
+            'username': 'faculty-unlinked',
+            'email': 'faculty-unlinked@northbridge.edu',
+            'full_name': 'Flo Unlinked',
+            'role': 'faculty',
+            'password': 'demo-unlinked',
+        },
+    )
+    assert unlinked.status_code == 201, unlinked.text
+    answer = client.post(
+        '/ai/chat',
+        headers=module_login(client, 'faculty-unlinked', 'demo-unlinked'),
+        json={'prompt': 'What do I teach?'},
+    )
+    assert answer.status_code == 200
+    assert 'not linked to a lecturer record' in answer.json()['answer']
+    schedule = client.get('/me/schedule', headers=module_login(client, 'faculty-unlinked', 'demo-unlinked')).json()
+    assert schedule['scope'] == 'lecturer'
+    assert schedule['sessions'] == []
+    assert 'no lecturer record' in schedule['note']
+
+    # Restore the administrator's unlinked state.
+    restored = client.patch(f'/admin/users/{admin_id}', headers=admin_headers, json={'clear_links': True})
+    assert restored.status_code == 200, restored.text
+    assert restored.json()['lecturer_id'] is None
+
+
 def test_student_cannot_read_institution_timetable(client, student_headers):
     response = client.get('/institutions/1/timetable', headers=student_headers)
     assert response.status_code == 403
@@ -135,8 +185,14 @@ def test_admin_ai_answer_is_institution_scoped(client, admin_headers):
 
 
 def test_ai_rejects_empty_prompt(client, admin_headers):
+    """Schema-driven validation: blank prompts are 422s, like every other
+    endpoint (R-008)."""
     response = client.post('/ai/chat', headers=admin_headers, json={'prompt': '   '})
-    assert response.status_code == 400
+    assert response.status_code == 422
+    missing = client.post('/ai/chat', headers=admin_headers, json={})
+    assert missing.status_code == 422
+    empty = client.post('/ai/chat', headers=admin_headers, json={'prompt': ''})
+    assert empty.status_code == 422
 
 
 def test_ai_requires_authentication(client):

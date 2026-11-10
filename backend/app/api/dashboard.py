@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 from app.api.deps import ensure_tenant, get_current_user
 from app.core.db import get_session
-from app.core.roles import STUDENT
+from app.core.roles import FACULTY, STUDENT
 from app.models import Campus, Course, Institution, Lecturer, Room, ScheduleProposal, SessionBooking, StudentGroup, User
 
 router = APIRouter(tags=['dashboard'])
@@ -148,24 +148,50 @@ def my_schedule(
     current_user: User = Depends(get_current_user), session: Session = Depends(get_session)
 ) -> dict[str, Any]:
     """Each role sees its own sessions: students their cohort, faculty their
-    teaching, campus operators and administrators the whole institution."""
+    teaching, campus operators and administrators the whole institution.
+
+    Scoping branches on the role, never on the lecturer/student-group link:
+    an administrator who happens to have a lecturer link still gets the
+    institution view, and a faculty account without a link gets an explicit
+    ``note`` instead of silently falling through to staff scope.
+    """
     institution_id = current_user.institution_id
     bookings = session.exec(select(SessionBooking).where(SessionBooking.institution_id == institution_id)).all()
+    note = ''
     if current_user.role == STUDENT:
         if current_user.student_group_id is None:
-            return {'role': current_user.role, 'scope': 'student', 'sessions': []}
+            return {
+                'role': current_user.role,
+                'scope': 'student',
+                'sessions': [],
+                'note': 'no student group is linked to this account',
+            }
         bookings = [booking for booking in bookings if booking.student_group_id == current_user.student_group_id]
         scope = 'student'
-    elif current_user.lecturer_id is not None:
+    elif current_user.role == FACULTY:
+        if current_user.lecturer_id is None:
+            return {
+                'role': current_user.role,
+                'scope': 'lecturer',
+                'sessions': [],
+                'note': 'no lecturer record is linked to this account',
+            }
         bookings = [booking for booking in bookings if booking.lecturer_id == current_user.lecturer_id]
         scope = 'lecturer'
     else:
         scope = 'institution'
 
-    course_by_id = {row.id: row for row in session.exec(select(Course)).all()}
-    lecturer_by_id = {row.id: row for row in session.exec(select(Lecturer)).all()}
-    group_by_id = {row.id: row for row in session.exec(select(StudentGroup)).all()}
-    room_by_id = {row.id: row for row in session.exec(select(Room)).all()}
+    course_by_id = {
+        row.id: row for row in session.exec(select(Course).where(Course.institution_id == institution_id)).all()
+    }
+    lecturer_by_id = {
+        row.id: row for row in session.exec(select(Lecturer).where(Lecturer.institution_id == institution_id)).all()
+    }
+    group_by_id = {
+        row.id: row
+        for row in session.exec(select(StudentGroup).where(StudentGroup.institution_id == institution_id)).all()
+    }
+    room_by_id = {row.id: row for row in session.exec(select(Room).where(Room.institution_id == institution_id)).all()}
 
     sessions = [
         booking_to_dict(
@@ -178,7 +204,7 @@ def my_schedule(
         for booking in bookings
     ]
     sessions.sort(key=lambda item: (item['day'], item['start_minute']))
-    return {'role': current_user.role, 'scope': scope, 'sessions': sessions}
+    return {'role': current_user.role, 'scope': scope, 'sessions': sessions, 'note': note}
 
 
 @router.get('/institutions/{institution_id}/timetable')
@@ -193,10 +219,17 @@ def institution_timetable(
     if current_user.role == STUDENT:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='students use /me/schedule')
     bookings = session.exec(select(SessionBooking).where(SessionBooking.institution_id == institution_id)).all()
-    course_by_id = {row.id: row for row in session.exec(select(Course)).all()}
-    lecturer_by_id = {row.id: row for row in session.exec(select(Lecturer)).all()}
-    group_by_id = {row.id: row for row in session.exec(select(StudentGroup)).all()}
-    room_by_id = {row.id: row for row in session.exec(select(Room)).all()}
+    course_by_id = {
+        row.id: row for row in session.exec(select(Course).where(Course.institution_id == institution_id)).all()
+    }
+    lecturer_by_id = {
+        row.id: row for row in session.exec(select(Lecturer).where(Lecturer.institution_id == institution_id)).all()
+    }
+    group_by_id = {
+        row.id: row
+        for row in session.exec(select(StudentGroup).where(StudentGroup.institution_id == institution_id)).all()
+    }
+    room_by_id = {row.id: row for row in session.exec(select(Room).where(Room.institution_id == institution_id)).all()}
     sessions = [
         booking_to_dict(
             booking,
