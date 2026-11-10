@@ -26,20 +26,20 @@ Protocol: [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).
 | ID | Title | Raised in | Status | Resolution / justification |
 |----|-------|-----------|--------|-----------------------------|
 | B-001 | Baseline scaffold present before round 1 | baseline | resolved | Superseded by round 1 delivery; retained for provenance only. Not a review finding. |
-| R-001 | Proposal approval skips backend revalidation (PROJECT.md) | round 1 (review) | open | `approve_proposal` applies stale solver rows without re-checking hard constraints against current data. |
-| R-002 | SSO links existing accounts by email without `email_verified` | round 1 (review) | open | Unverified-email IdP allows takeover of any matching account, including administrators. |
-| R-003 | Room capacity/room_type edits don't revalidate existing bookings | round 1 (review) | open | Shrinking a room or changing its type can leave stored bookings violating hard constraints. |
-| R-004 | Compose CORS allowlist uses container hostname, not browser origin | round 1 (review) | open | `http://frontend:5173` never matches the browser `Origin`, so Compose API calls fail preflight. |
-| R-005 | Compose ships fixed committed JWT secret `change-me` | round 1 (review) | open | Contradicts config design; repo holders can forge tokens for default deployments. |
-| R-006 | Unscoped lookups load every tenant's rows per request | round 1 (review) | open | `select(Course/Lecturer/StudentGroup/Room)` without institution filter in dashboard, scheduling, ai. |
-| R-007 | `/me/schedule` and AI scope branch on lecturer link, not role | round 1 (review) | open | Contradicts documented scoping; dead branch in `_faculty_context`. |
-| R-008 | `POST /ai/chat` accepts untyped dict body | round 1 (review) | open | No Pydantic schema, no OpenAPI validation; inconsistent with the rest of the API. |
-| R-009 | Compose stack never executed; frontend container is dev server | round 1 (review) | open | Static verification only; `npm run dev` in the image, no production build. |
-| R-010 | `.env.example` documents unread `USE_SQLITE_FOR_TESTS` | round 1 (review) | open | Misleading configuration surface; nothing reads the variable. |
-| R-011 | README/login demo docs inaccurate | round 1 (review) | open | Wrong default DB filename; seeded `harbor-admin` tenant undocumented. |
-| R-012 | `@react-three/drei` declared but never imported | round 1 (review) | open | Dead dependency inflating install and bundle size. |
-| R-013 | Frontend tree reports 18 known vulnerabilities | round 1 (review) | open | Visible in CI `npm ci` (2 critical, 1 high, 15 moderate); no audit gate. |
-| R-014 | No rate limiting on login; enumeration timing side channel | round 1 (review) | open | Unlimited guessing plus response-time oracle for account existence. |
+| R-001 | Proposal approval skips backend revalidation (PROJECT.md) | round 1 (review) | resolved | `approve_proposal` now revalidates: stale-reference checks (session/room deleted or moved off campus) plus full post-application state reconstruction and `count_hard_violations` re-run; `409` + audited `proposal_rejected`; 5 regression tests (`2862470`). |
+| R-002 | SSO links existing accounts by email without `email_verified` | round 1 (review) | resolved | `exchange_code_for_identity` surfaces `email_verified`; linking to an existing account and provisioning both require it (`403 email not verified by provider`); subject-matched links unaffected; 4 tests (`867a848`). |
+| R-003 | Room capacity/room_type edits don't revalidate existing bookings | round 1 (review) | resolved | `_validate_room_change` rejects `409` when a capacity shrink, room-type change, or campus move would break a referencing booking; documented reject policy; regression test (`3db21fc`). |
+| R-004 | Compose CORS allowlist uses container hostname, not browser origin | round 1 (review) | resolved | `BACKEND_CORS_ORIGINS: http://localhost:5173` — the browser origin (`64a60ed`). Stack still never executed; Docker not installed on this machine. |
+| R-005 | Compose ships fixed committed JWT secret `change-me` | round 1 (review) | resolved | `JWT_SECRET` line removed from Compose; ephemeral per-process dev secret path applies (`64a60ed`). |
+| R-006 | Unscoped lookups load every tenant's rows per request | round 1 (review) | resolved | every Course/Lecturer/StudentGroup/Room lookup in dashboard, scheduling, and ai is institution-filtered (`95deee0`). |
+| R-007 | `/me/schedule` and AI scope branch on lecturer link, not role | round 1 (review) | resolved | both branch on role first (student → cohort, faculty → lecturer with explicit unlinked note, operator/admin → institution); dead branch removed from `_faculty_context` (`95deee0`). |
+| R-008 | `POST /ai/chat` accepts untyped dict body | round 1 (review) | resolved | `AiChatRequest` schema (prompt 1–2000 chars, blank rejected); schema-driven 422s (`95deee0`). |
+| R-009 | Compose stack never executed; frontend container is dev server | round 1 (review) | resolved | frontend image is a production multi-stage build (`npm ci` + `npm run build`, nginx on 5173, SPA fallback `nginx.conf`), `VITE_API_BASE_URL` passed as build arg (`64a60ed`). Execution still not performed — Docker is not installed on this machine; static verification only. |
+| R-010 | `.env.example` documents unread `USE_SQLITE_FOR_TESTS` | round 1 (review) | resolved | line deleted (`64a60ed`). |
+| R-011 | README/login demo docs inaccurate | round 1 (review) | resolved | default DB corrected to `sqlite:///./demo.db`; `harbor-admin` / `demo-admin-harbor` (Harbor College) documented in README and login-page hint (`64a60ed`). |
+| R-012 | `@react-three/drei` declared but never imported | round 1 (review) | resolved | removed from `package.json` and lockfile; no source imports existed; three-mesh-bvh deprecation warning gone from CI (`f413d85`). |
+| R-013 | Frontend tree reports 18 known vulnerabilities | round 1 (review) | resolved | toolchain upgraded (router 7, vite 8, vitest 5, plugin-react 5, `@types/three`), lockfile regenerated; `minimatch` pinned to patched `^11.0.5` via override (npm's suggested fix is a breaking eslint downgrade; without the override GHSA-g3hv-75wg-m249 resurfaces); `npm audit` = 0 vulnerabilities (was 18); `npm audit --audit-level=high` added as a CI gate (`f413d85`, `b735b90`). |
+| R-014 | No rate limiting on login; enumeration timing side channel | round 1 (review) | resolved | dummy-hash bcrypt verification equalizes every 401; sliding-window per-(IP, identifier) lockout — 5 failures / 15 min → `429` + `Retry-After`, identical for unknown accounts; success resets; 6 tests (`2394eb6`). |
 
 ## Round log
 
@@ -106,3 +106,66 @@ tenant-leaking endpoint, a stubbed SSO path, and no `frontend/Dockerfile` despit
   allowlist and dev-server frontend mean it has never actually worked (R-004, R-009).
   Prior issue B-001 verified resolved. Full detail:
   [`docs/rounds/round-01-review.md`](docs/rounds/round-01-review.md).
+
+### Round 2
+
+- **Developer:** delivered `b735b9018ed9218e646ac4d1ff295535523bbe8b` (handoff:
+  [`docs/rounds/round-02-handoff.md`](docs/rounds/round-02-handoff.md)) — all 14
+  findings from the round-1 review implemented; none deferred except the
+  execution of the Compose stack, which is impossible on this machine (Docker is
+  not installed).
+  - **R-001** (`2862470`): `approve_proposal` revalidates the stored solver rows
+    against the tenant's *current* data — stale-reference checks (session or room
+    deleted / moved off the proposal's campus) plus a reconstruction of the
+    post-application state and a full `count_hard_violations` re-run; violations
+    reject with `409` and an audited `proposal_rejected` event. Generation params
+    travel in the proposal payload so the availability window is rechecked. 5
+    regression tests, each proven to fail with the revalidation call disabled.
+  - **R-002** (`867a848`): the OIDC `email_verified` claim is surfaced by
+    `exchange_code_for_identity` and enforced by `_resolve_sso_user` — linking to an
+    existing account (any role) and provisioning both refuse with
+    `403 email not verified by provider` unless the provider asserts the address is
+    verified; already-linked subject identities are unaffected. 4 new tests,
+    endpoint-level tests proven to fail with the gate forced true.
+  - **R-003** (`3db21fc`): `update_room` revalidates capacity / room_type / campus
+    changes against every booking referencing the room and rejects `409` naming the
+    offending booking — documented policy: the operator moves those sessions first.
+    Regression test proven to fail with the validation skipped.
+  - **R-006/R-007/R-008** (`95deee0`): all dashboard/scheduling/ai lookups
+    institution-scoped; `/me/schedule` and AI context branch on role first with an
+    explicit note for unlinked faculty and institution scope for operators/admins
+    (dead `_faculty_context` branch removed); `POST /ai/chat` takes the
+    `AiChatRequest` Pydantic schema (blank/oversized prompts → 422).
+  - **R-014** (`2394eb6`): every 401 pays exactly one bcrypt verification (dummy
+    hash when no user/no stored hash), and a sliding-window limiter locks out
+    5 failed attempts per (client IP, attempted identifier) in 15 minutes with
+    `429` + `Retry-After` — equally for nonexistent accounts, so neither timing nor
+    lockout leaks account existence. 6 tests.
+  - **R-004/R-005/R-009/R-010/R-011** (`64a60ed`): Compose CORS origin is the
+    browser origin `http://localhost:5173`; the committed `JWT_SECRET` is gone
+    (ephemeral dev secret applies); the frontend image is a production multi-stage
+    build served by nginx on 5173 with SPA fallback and `VITE_API_BASE_URL` as a
+    build arg; `USE_SQLITE_FOR_TESTS` deleted from `.env.example`; README default
+    DB corrected and `harbor-admin` documented. **Docker was still never executed**
+    — not installed on this machine; the stack changes are statically verified
+    only.
+  - **R-012/R-013** (`f413d85`, `b735b90`): completed the inherited uncommitted
+    dependency overhaul (the lockfile was missing the `@types/three` tree, so
+    `npm ci` failed — regenerated, then verified with a clean `npm ci`):
+    `@react-three/drei` removed (never imported), react-router-dom 6→7,
+    vite 5→8, vitest 2→5, @vitejs/plugin-react 4→5. `npm audit` now reports **0
+    vulnerabilities** (CI reported 18 in round 1); the `minimatch@^11.0.5`
+    override is load-bearing (without it GHSA-g3hv-75wg-m249 resurfaces through
+    eslint 10 / typescript-eslint 8.72; npm's own fix is a breaking eslint
+    downgrade). `npm audit --audit-level=high` added as a CI gate after `npm ci`.
+  - **Local/CI mismatch found and fixed**: first push of the round (`f413d85`, run
+    `42934118803`) failed the frontend Build step — `@vitejs/plugin-react` v5
+    types resolve through the package `exports` map, unreadable under the legacy
+    `moduleResolution: "Node"`; local builds had passed only via a stale
+    `tsconfig.node.tsbuildinfo` incremental cache skipping `vite.config.ts`.
+    `b735b90` sets `moduleResolution: "bundler"` in both tsconfigs; fix verified
+    from a clean state (caches deleted, gates re-run). CI run `42934586787` on
+    `b735b90` is fully green and matches local exactly: Ruff clean, pytest
+    **113 passed**, ESLint clean, Vitest **12 files / 32 tests**, audit
+    **0 vulnerabilities**, build with identical asset hashes
+    (`index-SvLVliAF.css`, `index-BrSS0O_p.js`).
