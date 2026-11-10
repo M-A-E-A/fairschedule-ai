@@ -23,7 +23,23 @@ if _TEST_DB.exists():
 
 import pytest  # noqa: E402
 from app.main import app  # noqa: E402
+from app.services.rate_limit import login_rate_limiter  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_login_throttle():
+    """Start every test with an empty login-failure counter.
+
+    The rate limiter is module-level state shared by the whole session, and
+    the client fixture is session-scoped; without this reset, failures
+    recorded in one test could lock an account out in a later, unrelated
+    test. Tests that exercise the lockout itself build up their own counts
+    inside their own body.
+    """
+    login_rate_limiter.reset()
+    yield
+    login_rate_limiter.reset()
 
 
 @pytest.fixture(scope='session')

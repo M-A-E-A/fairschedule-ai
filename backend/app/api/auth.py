@@ -6,7 +6,7 @@ import secrets
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 
@@ -14,10 +14,11 @@ from app.api.deps import get_current_user
 from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.roles import ALL_ROLES
-from app.core.security import create_access_token, verify_password
+from app.core.security import DUMMY_PASSWORD_HASH, create_access_token, verify_password
 from app.models import AuditEvent, Institution, User
 from app.schemas.auth import AuthToken, LoginRequest, MeResponse, SsoConfigResponse
 from app.services import sso
+from app.services.rate_limit import login_rate_limiter
 
 router = APIRouter(prefix='/auth', tags=['auth'])
 settings = get_settings()
@@ -35,16 +36,40 @@ def _issue_token(user: User) -> AuthToken:
 
 
 @router.post('/login', response_model=AuthToken)
-def login(payload: LoginRequest, session: Session = Depends(get_session)) -> AuthToken:
-    """Sign in with the app-managed username (or the account's email)."""
+def login(payload: LoginRequest, request: Request, session: Session = Depends(get_session)) -> AuthToken:
+    """Sign in with the app-managed username (or the account's email).
+
+    Two hardening properties hold for every 401:
+
+    - The bcrypt verification runs exactly once whether or not the account
+      exists (against ``DUMMY_PASSWORD_HASH`` when there is no stored hash),
+      so response timing never reveals which usernames/emails are real.
+    - Failures are counted per (client IP, attempted identifier); past the
+      threshold the pair is locked out with 429 regardless of whether the
+      account exists, so the throttling itself leaks nothing either.
+    """
+    client_ip = request.client.host if request.client else 'unknown'
+    throttle_key = (client_ip, (payload.username or str(payload.email)).lower())
+    wait_seconds = login_rate_limiter.locked_for(throttle_key)
+    if wait_seconds > 0:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail='too many failed login attempts; try again later',
+            headers={'Retry-After': str(wait_seconds)},
+        )
+
     statement = select(User).where(User.username == payload.username) if payload.username else select(User).where(
         User.email == (payload.email or '').lower()
     )
     user = session.exec(statement).first()
-    if user is None or not user.password_hash or not verify_password(payload.password, user.password_hash):
+    stored_hash = user.password_hash if user is not None and user.password_hash else DUMMY_PASSWORD_HASH
+    password_ok = verify_password(payload.password, stored_hash)
+    if user is None or not user.password_hash or not password_ok:
+        login_rate_limiter.record_failure(throttle_key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='invalid credentials')
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='account disabled')
+    login_rate_limiter.record_success(throttle_key)
     return _issue_token(user)
 
 

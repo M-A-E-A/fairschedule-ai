@@ -23,6 +23,15 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
+# A valid bcrypt hash of a random string, fixed forever. Login verification
+# runs `verify_password` against this when no stored hash is available (user
+# not found, or an SSO account with no password), so an unknown username
+# pays the same bcrypt cost as a known one: response timing cannot reveal
+# which accounts exist.
+DUMMY_PASSWORD_HASH = '$2b$12$1rK0TCII1lu7Jd5bHsIHAe5Ped.wlqN7fr6R1mSPyf9ZKQ10O7o3e'
+
+
+
 def create_access_token(user_id: int, role: str, institution_id: int) -> str:
     """Issue a short-lived bearer token.
 
@@ -45,4 +54,11 @@ def decode_access_token(token: str) -> dict:
     return jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
 
 
-__all__ = ['JWTError', 'create_access_token', 'decode_access_token', 'hash_password', 'verify_password']
+__all__ = [
+    'DUMMY_PASSWORD_HASH',
+    'JWTError',
+    'create_access_token',
+    'decode_access_token',
+    'hash_password',
+    'verify_password',
+]
