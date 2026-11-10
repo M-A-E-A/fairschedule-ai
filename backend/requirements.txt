@@ -5,6 +5,10 @@ sqlalchemy==2.0.35
 pydantic-settings==2.5.2
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
+# bcrypt 5.x removed `__about__` and rejects >72-byte secrets inside passlib's
+# backend detection, which crashes every password hash. Pin to the 4.x line that
+# passlib 1.7.4 supports (local and CI must agree).
+bcrypt==4.0.1
 python-multipart==0.0.9
 ortools==9.10.4067
 psycopg[binary]==3.3.8
