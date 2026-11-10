@@ -336,3 +336,279 @@ th, td {
     min-height: auto;
   }
 }
+
+
+/* ---- Session views, role chrome and app surfaces (round 1) ---- */
+
+.sidebar nav ul {
+  list-style: none;
+  padding: 0;
+  margin-top: 24px;
+  display: grid;
+  gap: 10px;
+  color: #dfeaff;
+}
+
+.sidebar nav a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: #dfeaff;
+}
+
+.sidebar nav a.active {
+  background: rgba(79, 142, 247, 0.22);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.tenant-name {
+  color: #93c5fd;
+  font-size: 0.82rem;
+  margin-top: -6px;
+}
+
+.sidebar-footer {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  display: grid;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.role-badge,
+.status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  background: rgba(79, 142, 247, 0.2);
+  color: #93c5fd;
+}
+
+.status-badge {
+  background: rgba(148, 163, 184, 0.16);
+  color: #cbd5e1;
+}
+
+.status-published {
+  background: rgba(34, 197, 94, 0.18);
+  color: #6ee7a7;
+}
+
+.signed-in-as {
+  color: #c7d5ed;
+}
+
+.sign-out {
+  justify-self: start;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: transparent;
+  color: #e7eefb;
+  border-radius: 999px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.auth-tabs .tab {
+  flex: 1;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.5);
+  color: #c7d5ed;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.auth-tabs .tab.active {
+  background: rgba(79, 142, 247, 0.25);
+  border-color: #4f8ef7;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.sso-button {
+  display: inline-flex;
+  justify-content: center;
+  padding: 0.82rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(148, 163, 184, 0.1);
+  font-weight: 700;
+}
+
+.error-notice {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.notice {
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.lottie-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #bfd3f4;
+  font-size: 0.92rem;
+}
+
+.lottie-loader-label {
+  color: inherit;
+}
+
+.guard-state {
+  display: grid;
+  place-items: center;
+  min-height: 40vh;
+}
+
+.empty-state {
+  color: #94a3b8;
+  padding: 14px 4px;
+}
+
+.schedule-days {
+  display: grid;
+  gap: 18px;
+}
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.session-card {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+
+.session-time {
+  display: grid;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-time span {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.session-body {
+  display: grid;
+  gap: 4px;
+}
+
+.session-course {
+  font-weight: 700;
+}
+
+.session-meta {
+  color: #aab9d6;
+  font-size: 0.88rem;
+}
+
+.generate-form,
+.chat-form,
+.create-form form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.generate-form label,
+.create-form label,
+.campus-select {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #c6d3eb;
+}
+
+.generate-form select,
+.create-form input,
+.create-form select,
+.chat-form input,
+.campus-select select {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: white;
+  font: inherit;
+}
+
+.create-form {
+  margin-bottom: 18px;
+}
+
+.chat-panel {
+  display: grid;
+  gap: 14px;
+  min-height: 180px;
+  margin-bottom: 16px;
+}
+
+.chat-turn {
+  display: grid;
+  gap: 6px;
+}
+
+.chat-question {
+  justify-self: end;
+  max-width: 75%;
+  background: rgba(79, 142, 247, 0.2);
+  border-radius: 14px 14px 4px 14px;
+  padding: 9px 14px;
+  margin: 0;
+}
+
+.chat-answer {
+  justify-self: start;
+  max-width: 75%;
+  background: rgba(148, 163, 184, 0.14);
+  border-radius: 14px 14px 14px 4px;
+  padding: 9px 14px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.chat-form input {
+  flex: 1;
+}
+
+.room-legend {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  color: #c6d3eb;
+  font-size: 0.9rem;
+}

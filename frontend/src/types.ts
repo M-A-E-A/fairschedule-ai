@@ -1,0 +1,116 @@
+/** Shared API response types mirroring the backend schemas. */
+
+export type Role = 'administrator' | 'campus_operator' | 'faculty' | 'student';
+
+/** Roles that may plan schedules and read the full timetable. */
+export const STAFF_ROLES: Role[] = ['administrator', 'campus_operator', 'faculty'];
+/** Roles that may allocate rooms (mirrors backend ROOM_MANAGERS). */
+export const ROOM_MANAGER_ROLES: Role[] = ['administrator', 'campus_operator'];
+
+export interface AuthToken {
+  access_token: string;
+  token_type: string;
+  role: Role;
+  institution_id: number;
+  username: string;
+  full_name: string;
+}
+
+export interface MeResponse {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  role: Role;
+  institution_id: number;
+  institution_name: string;
+  student_group_id: number | null;
+  lecturer_id: number | null;
+}
+
+export interface SsoConfig {
+  enabled: boolean;
+  provider: string;
+  login_url: string;
+  client_id: string;
+  redirect_uri: string;
+}
+
+export interface OverviewResponse {
+  institution_id: number;
+  institution_name: string;
+  campuses: number;
+  rooms: number;
+  courses: number;
+  lecturers: number;
+  student_groups: number;
+  sessions: number;
+  published_sessions: number;
+  pending_proposals: number;
+  role: Role;
+}
+
+export interface ScheduleSession {
+  id: number;
+  campus_id: number;
+  course_id: number;
+  course_code: string;
+  course_name: string;
+  lecturer_id: number;
+  lecturer_name: string;
+  student_group_id: number;
+  student_group_name: string;
+  room_id: number;
+  room_name: string;
+  day: number;
+  day_name: string;
+  start_minute: number;
+  start_time: string;
+  end_minute: number;
+  end_time: string;
+  duration_minute: number;
+  status: string;
+}
+
+export interface ScheduleResponse {
+  role: Role;
+  scope: 'student' | 'lecturer' | 'institution';
+  sessions: ScheduleSession[];
+}
+
+export interface TimetableResponse {
+  institution_id: number;
+  sessions: ScheduleSession[];
+}
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  role: Role;
+  institution_id: number;
+  is_active: boolean;
+  student_group_id: number | null;
+  lecturer_id: number | null;
+  sso_linked: boolean;
+}
+
+export interface Room {
+  id: number;
+  institution_id: number;
+  campus_id: number;
+  name: string;
+  capacity: number;
+  room_type: string;
+  equipment: string;
+}
+
+export interface Campus {
+  id: number;
+  name: string;
+  slug: string;
+  width: number;
+  depth: number;
+  room_count: number;
+}
