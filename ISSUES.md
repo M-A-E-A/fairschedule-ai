@@ -220,3 +220,26 @@ tenant-leaking endpoint, a stubbed SSO path, and no `frontend/Dockerfile` despit
   - All 14 prior findings verified still resolved in the current tree (delta from
     `b735b90` touches only the three R-015 files plus docs; each resolution's key
     invariant re-spot-checked).
+- **Reviewer:** audited `a682bde` statically — all 110 tracked files (docs-only delta
+  from the code snapshot `89c7547`) — plus CI run `42937728527` cross-checked read-only
+  via `gh run view --log` (it checks out `89c7547` exactly); run `42939141700` on the
+  handoff commit is also green. All checks pass and local/CI agree (backend 115 passed —
+  local's 1 warning vs CI's 2 is the disclosed Linux-only passlib `crypt` notice, an
+  environmental difference in warnings, not in results; Ruff clean; ESLint clean; Vitest
+  12 files/32 tests; audit 0; build green with identical hashes), so there are **no
+  blocking issues**. **R-015 verified resolved**: both `COPY` lines present and placed
+  after `COPY app`; the five-link static evidence chain re-verified link by link
+  (lifespan → `BACKEND_ROOT` = `/app` → COPY placement → `.dockerignore`
+  non-exclusion checked against Docker's documented pattern semantics → Compose/image
+  agreement); the regression guard is genuine (proven to fail on the pre-fix Dockerfile,
+  and it derives its needed paths from `build_alembic_config()` rather than constants).
+  The image was never built or run — accepted as the same disclosed environmental
+  deferral as rounds 1–2; the declined CI `docker build` gate is accepted because a CI
+  image build would not have caught R-015 (the pre-fix image builds cleanly; the failure
+  is at startup) and the static guard covers the defect class more directly. No new
+  findings; none of the 15 prior findings reintroduced. Verdict is **APPROVE** — with
+  zero open rows in the index, no new findings, and all checks green, the loop's
+  termination condition is met. The one environmental item on record: the first
+  Docker-capable machine should run `docker compose up --build` plus a standalone
+  `docker run` boot check (R-009/R-015 execution half). Full detail:
+  [`docs/rounds/round-03-review.md`](docs/rounds/round-03-review.md).
