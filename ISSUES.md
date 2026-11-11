@@ -40,6 +40,7 @@ Protocol: [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).
 | R-012 | `@react-three/drei` declared but never imported | round 1 (review) | resolved | removed from `package.json` and lockfile; no source imports existed; three-mesh-bvh deprecation warning gone from CI (`f413d85`). |
 | R-013 | Frontend tree reports 18 known vulnerabilities | round 1 (review) | resolved | toolchain upgraded (router 7, vite 8, vitest 5, plugin-react 5, `@types/three`), lockfile regenerated; `minimatch` pinned to patched `^11.0.5` via override (npm's suggested fix is a breaking eslint downgrade; without the override GHSA-g3hv-75wg-m249 resurfaces); `npm audit` = 0 vulnerabilities (was 18); `npm audit --audit-level=high` added as a CI gate (`f413d85`, `b735b90`). |
 | R-014 | No rate limiting on login; enumeration timing side channel | round 1 (review) | resolved | dummy-hash bcrypt verification equalizes every 401; sliding-window per-(IP, identifier) lockout — 5 failures / 15 min → `429` + `Retry-After`, identical for unknown accounts; success resets; 6 tests (`2394eb6`). |
+| R-015 | Backend image missing `alembic.ini`/`alembic/` — boots only under Compose's bind mount | round 2 (review) | open | Found by round-2 review: `backend/Dockerfile` copies only `requirements.txt` and `app/`, but startup runs `run_migrations()`, which needs `BACKEND_ROOT/alembic.ini` and `BACKEND_ROOT/alembic`. Works under Compose only because `./backend:/app` is bind-mounted over the image. Fix: add `COPY alembic.ini ./` and `COPY alembic ./alembic` to `backend/Dockerfile` (both already in the build context; `.dockerignore` does not exclude them). |
 
 ## Round log
 
@@ -169,3 +170,18 @@ tenant-leaking endpoint, a stubbed SSO path, and no `frontend/Dockerfile` despit
     **113 passed**, ESLint clean, Vitest **12 files / 32 tests**, audit
     **0 vulnerabilities**, build with identical asset hashes
     (`index-SvLVliAF.css`, `index-BrSS0O_p.js`).
+- **Reviewer:** audited `e911fa0` statically — all 107 tracked files (docs-only delta
+  from the code snapshot `b735b90`) — plus CI run `42934586787` cross-checked read-only
+  via `gh run view --log` (it checks out `b735b90` exactly). All checks pass and
+  local/CI agree (backend 113 passed — local's 1 warning vs CI's 2 is the disclosed
+  Linux-only passlib `crypt` notice; Ruff clean; ESLint clean; Vitest 12 files/32
+  tests; audit 0; build green with identical hashes), so there are **no blocking
+  issues**. All 14 prior findings verified genuinely resolved in code, none
+  reintroduced; R-009's execution half is accepted as a justified environmental
+  deferral (Docker not installed, disclosed prominently, exactly as the protocol
+  requires) and remains tracked. Verdict is **REJECT** with **one new finding,
+  R-015**: the backend Docker image omits `alembic.ini` and `alembic/`, so it cannot
+  boot outside Compose — the `./backend:/app` bind mount is the only thing making the
+  documented stack work, and the missing execution R-009 asked for is exactly why it
+  went unnoticed. The fix is two static `COPY` lines, no Docker needed. Full detail:
+  [`docs/rounds/round-02-review.md`](docs/rounds/round-02-review.md).
