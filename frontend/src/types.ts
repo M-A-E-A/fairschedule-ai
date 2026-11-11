@@ -106,6 +106,21 @@ export interface Room {
   equipment: string;
 }
 
+/** A session booking row (GET /institutions/:id/bookings). */
+export interface Booking {
+  id: number;
+  institution_id: number;
+  campus_id: number;
+  course_id: number;
+  lecturer_id: number;
+  student_group_id: number;
+  room_id: number;
+  day: number;
+  start_minute: number;
+  duration_minute: number;
+  status: string;
+}
+
 export interface Campus {
   id: number;
   name: string;
@@ -113,4 +128,23 @@ export interface Campus {
   width: number;
   depth: number;
   room_count: number;
+}
+
+export interface Course {
+  id: number;
+  code: string;
+  name: string;
+  required_room_type: string;
+}
+
+export interface Lecturer {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface StudentGroup {
+  id: number;
+  name: string;
+  size: number;
 }

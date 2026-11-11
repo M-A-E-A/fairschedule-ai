@@ -17,7 +17,8 @@ FairSchedule AI is a demo multi-tenant university scheduling system built with F
 - Timetable generation using OR-Tools CP-SAT
 - Repair proposal generation and audit log
 - AI assistant stub that works without external keys
-- 3D campus visualization with React Three Fiber
+- 3D campus visualization with React Three Fiber: buildings colored by live
+  occupancy for a chosen day/time window, click a building for its day schedule
 - Public landing page with GSAP scroll animations
 
 ## Local setup

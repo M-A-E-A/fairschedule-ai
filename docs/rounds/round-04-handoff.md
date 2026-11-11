@@ -15,10 +15,8 @@ verified; none may be reintroduced.
 | S-01 | Solver time limit | done | `3f48122` |
 | S-02 | Rate-limiter persistence | done | `bdc36c4` |
 | S-03 | PostgreSQL exercised in CI | done | `dc14dd8` |
-| S-04 | Docker build + container smoke test in CI | done (CI verification pending below) | (this commit) |
-| S-03 | PostgreSQL exercised in CI | pending | — |
-| S-04 | Docker build + container smoke test in CI | pending | — |
-| S-05 | 3D campus ↔ schedule integration | pending | — |
+| S-04 | Docker build + container smoke test in CI | done | `8cf3370` |
+| S-05 | 3D campus ↔ schedule integration | done | (this commit) |
 | S-06 | Timetable publish workflow | pending | — |
 | S-07 | CSV import | pending | — |
 | S-08 | ICS calendar export | pending | — |
@@ -191,6 +189,81 @@ https://github.com/M-A-E-A/fairschedule-ai/actions/runs/43047958410
 - **Not run locally** — no Docker on the development machine; CI-only per the
   scope doc's exemption. Local gates unchanged (ruff/pytest backend, and the
   frontend gates below from S-05 onward).
+
+**S-04 CI result (run `43048438611` on `8cf3370`, all four jobs green):** both
+images built and booted on the first push. Verbatim evidence from the job log
+(job databaseId `130618643278`):
+
+```
+Docker (build + container smoke test)	Build the backend image	#13 naming to docker.io/library/fairschedule-backend:ci done
+Docker (build + container smoke test)	Run the backend container and assert GET /health returns 200	backend container serves GET /health with 200
+Docker (build + container smoke test)	Build the frontend image	#17 naming to docker.io/library/fairschedule-frontend:ci done
+Docker (build + container smoke test)	Run the frontend container and assert the SPA is served	frontend container serves the built SPA
+```
+
+The backend container reaching `/health` 200 also proves the in-image Alembic
+migrations plus demo seed ran against the real PostgreSQL service (the R-015
+wiring). Run URL:
+https://github.com/M-A-E-A/fairschedule-ai/actions/runs/43048438611
+
+
+### S-05 — 3D campus ↔ schedule integration (commit: this milestone's)
+
+The scene now talks to the timetable instead of being decorative geometry:
+
+- `CampusPage` gained a **day selector** (Monday–Sunday, matching the backend's
+  `DAY_NAMES`) and a **time-of-day selector** (default 09:00). Buildings in
+  the 3D scene and entries in the legend list are colored by **live occupancy
+  for that window**: red (`#f87171`) while a session covers the selected
+  (day, time), green (`#34d399`) otherwise. The occupancy window semantics
+  (start inclusive, end exclusive) live in the exported pure helper
+  `occupiedRoomIds(bookings, day, minute)` — no static or hardcoded
+  occupancy anywhere; it recomputes from the bookings payload on every
+  selector change.
+- **Clicking a room's building (mesh `onClick`) or its legend button** opens a
+  schedule panel for that room on the selected day, sorted by start time,
+  with course (`code · name`), lecturer, cohort, time range, and status badge;
+  an empty state names the room and day when nothing is booked. Selecting
+  survives day switches and clears when the campus changes.
+- Data comes **only from existing authenticated, tenant-scoped endpoints**:
+  `GET /institutions/:id/bookings` (the backend already role-scopes students
+  to their own cohort there — students see an explicit "occupancy reflects
+  your cohort's sessions" hint), plus `/rooms`, `/campuses`, and the existing
+  `/courses`, `/lecturers`, `/student-groups` label lookups. No new backend
+  endpoint was needed.
+- Tests (`frontend/src/pages/CampusPage.test.tsx`, rewritten): pure-helper
+  boundary semantics (start inclusive/end exclusive/other day/empty),
+  time parse/format round-trips, occupancy legend text per room, campus
+  switching, **recoloring on day/time changes including the mesh material
+  color in the scene**, room schedule selection from a legend click
+  (including day re-scope), and selection from a 3D mesh click. The
+  `@react-three/fiber` `Canvas` mock renders its scene children as DOM, so
+  the tests click the actual `mesh[name=…]` nodes and read their
+  `meshstandardmaterial` colors — the 3D wiring is under test, not mocked
+  away.
+
+Raw local gate output (frontend):
+
+```
+$ npm run lint
+> fairschedule-ai-frontend@0.1.0 lint
+> eslint .
+
+(finishes with 0 errors; 3 pre-existing-style react-refresh warnings for the
+exported helper/component pattern the page already used before this round)
+
+$ npm run test -- --run
+Test Files  12 passed (12)
+     Tests  37 passed (37)
+   Duration  43.50s
+
+$ npm run build
+✓ built in 4.14s
+```
+
+(32 tests before this round − 2 replaced + 7 = 37; the main chunk is still
+1,551 kB with the >500 kB warning — three.js — which is exactly S-11's
+mandate, not addressed here.)
 
 ## Interim failures
 
