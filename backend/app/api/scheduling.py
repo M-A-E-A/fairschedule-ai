@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
 from app.api.deps import ensure_tenant, require_roles
+from app.core.config import get_settings
 from app.core.db import get_session
 from app.core.roles import PROPOSAL_APPROVERS, SCHEDULE_MANAGERS
 from app.models import (
@@ -95,7 +96,13 @@ def generate_schedule(
         day_start=payload.day_start,
         day_end=payload.day_end,
         allow_time_change=payload.allow_time_change,
-        time_limit_seconds=payload.time_limit_seconds,
+        # S-01: the wall-clock budget is env-configured
+        # (SOLVER_TIME_LIMIT_SECONDS, default 10s); a request may override it
+        # explicitly. The solver must return within the budget whatever the
+        # instance size, reporting UNKNOWN honestly when it cannot finish.
+        time_limit_seconds=payload.time_limit_seconds
+        if payload.time_limit_seconds is not None
+        else get_settings().solver_time_limit_seconds,
     )
 
     proposal = ScheduleProposal(

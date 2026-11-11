@@ -14,7 +14,9 @@ class ScheduleGenerateRequest(BaseModel):
     day_start: int = 480
     day_end: int = 1080
     allow_time_change: bool = True
-    time_limit_seconds: float = Field(default=10.0, ge=0.5, le=60.0)
+    # Explicit per-request override of the SOLVER_TIME_LIMIT_SECONDS default;
+    # when omitted the endpoint uses the environment-configured default.
+    time_limit_seconds: float | None = Field(default=None, ge=0.5, le=3600.0)
 
 
 class RoomCreateRequest(BaseModel):

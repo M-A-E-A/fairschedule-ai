@@ -10,7 +10,7 @@ from __future__ import annotations
 import secrets
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     public_base_url: str = 'http://localhost:8000'
     ai_provider: str = 'none'
     ai_api_key: str = ''
+    # Wall-clock budget for the CP-SAT solve (docs/PROJECT.md evaluation
+    # metric "time to generate"/"timeout"). S-01: without this a large
+    # institution can hang the request and pin a worker.
+    solver_time_limit_seconds: float = Field(default=10.0, gt=0.0)
 
     # Google OAuth / university OIDC single sign-on.
     sso_provider: str = 'google'  # 'google' | 'oidc' | 'none'

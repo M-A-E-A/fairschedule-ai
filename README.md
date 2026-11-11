@@ -36,6 +36,15 @@ PostgreSQL URL when using the Compose `db` service. After editing models, create
 migration with `alembic revision --autogenerate -m "describe change"` and re-run
 `alembic upgrade head`.
 
+`SOLVER_TIME_LIMIT_SECONDS` (default `10`) caps the wall-clock time of the CP-SAT
+solve behind `POST /schedules/generate`, so a large institution cannot hang the
+request and pin a worker. When the solver cannot finish inside the budget, the
+response reports status `UNKNOWN` (never a partial result presented as a full
+schedule: the deterministic fallback assignment — which honours every hard
+constraint — is served with `solution_source: "greedy_fallback"`), and the
+`metrics` block exposes `solver_status` and `time_to_generate_ms`. A request may
+override the default once with `time_limit_seconds` in the JSON body.
+
 In another terminal:
 
 ```bash
