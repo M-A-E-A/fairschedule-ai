@@ -666,3 +666,67 @@ th, td {
   margin: 0 0 10px;
   font-size: 1.05rem;
 }
+
+.publish-panel h3 {
+  margin: 0 0 12px;
+}
+
+.publish-form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.publish-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #c6d3eb;
+}
+
+.publish-form input {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: white;
+  font: inherit;
+}
+
+.version-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  color: #c6d3eb;
+  font-size: 0.9rem;
+}
+
+.diff-summary h4 {
+  margin: 0 0 6px;
+}
+
+.diff-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-list .diff-added {
+  color: #34d399;
+}
+
+.diff-list .diff-removed {
+  color: #f87171;
+}
+
+.diff-list .diff-moved {
+  color: #fbbf24;
+}

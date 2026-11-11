@@ -1,4 +1,5 @@
-"""Schedule generation, proposals, approval, and the audit trail.
+"""Schedule generation, proposals, approval, the audit trail, and the
+timetable publish lifecycle (S-06).
 
 Generation never mutates bookings: it runs the solver, stores the result as a
 ``ScheduleProposal``, and only an authorised approver (administrator or campus
@@ -9,11 +10,17 @@ Approval revalidates the stored rows against the tenant's *current* data
 (``_revalidate_proposal``): between generation and approval bookings and
 rooms change freely, so a proposal is applied only after every hard
 constraint has been re-checked and any stale reference rejected.
+
+Publishing freezes a named, versioned snapshot of the tenant's whole
+timetable in ``TimetableVersion``; the snapshot is immutable, so any previous
+version stays queryable exactly as published, and the diff endpoint compares
+the live draft against the latest published version.
 """
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -30,9 +37,10 @@ from app.models import (
     ScheduleProposal,
     SessionBooking,
     StudentGroup,
+    TimetableVersion,
     User,
 )
-from app.schemas.scheduling import ScheduleGenerateRequest
+from app.schemas.scheduling import ScheduleGenerateRequest, TimetablePublishRequest
 from app.services.scheduler import DAY_MINUTES, count_hard_violations, generate_schedule_rows
 
 router = APIRouter(tags=['scheduling'])
@@ -346,3 +354,171 @@ def list_audit_events(
         }
         for event in sorted(rows, key=lambda item: item.id, reverse=True)
     ]
+
+
+# --- S-06: timetable publish lifecycle --------------------------------------
+
+
+def _booking_snapshot(booking: SessionBooking) -> dict[str, Any]:
+    """The frozen row shape stored inside a TimetableVersion payload.
+
+    Fields only (no joined labels): the snapshot must stay meaningful even
+    after the referenced course/lecturer/group/room rows are edited or
+    deleted — a published version is history, not a live join.
+    """
+    return {
+        'id': booking.id,
+        'campus_id': booking.campus_id,
+        'course_id': booking.course_id,
+        'lecturer_id': booking.lecturer_id,
+        'student_group_id': booking.student_group_id,
+        'room_id': booking.room_id,
+        'day': booking.day,
+        'start_minute': booking.start_minute,
+        'duration_minute': booking.duration_minute,
+        'status': booking.status,
+    }
+
+
+@router.post('/institutions/{institution_id}/timetable/publish')
+def publish_timetable(
+    institution_id: int,
+    payload: TimetablePublishRequest,
+    current_user: User = Depends(require_roles(*PROPOSAL_APPROVERS)),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Freeze the tenant's current timetable as a named, versioned snapshot.
+
+    Only proposal approvers (administrator, campus operator) may publish —
+    the same human-in-the-loop boundary as proposal approval. Publishing
+    copies the current booking rows; it never mutates them, and a stored
+    version is never rewritten afterwards.
+    """
+    ensure_tenant(current_user, institution_id)
+    bookings = session.exec(
+        select(SessionBooking).where(SessionBooking.institution_id == institution_id)
+    ).all()
+    existing_versions = session.exec(
+        select(TimetableVersion).where(TimetableVersion.institution_id == institution_id)
+    ).all()
+    version_number = max((row.version for row in existing_versions), default=0) + 1
+
+    version_row = TimetableVersion(
+        institution_id=institution_id,
+        version=version_number,
+        label=payload.label.strip() or f'Version {version_number}',
+        published_by_email=current_user.email,
+        published_at=datetime.now(UTC).replace(tzinfo=None),
+        json_payload=json.dumps([_booking_snapshot(booking) for booking in bookings]),
+    )
+    session.add(version_row)
+    session.add(
+        AuditEvent(
+            institution_id=institution_id,
+            user_email=current_user.email,
+            event_type='timetable_published',
+            message=f'Published timetable version {version_number} '
+            f'"{version_row.label}" ({len(bookings)} session(s))',
+        )
+    )
+    session.commit()
+    session.refresh(version_row)
+    return {
+        'id': version_row.id,
+        'version': version_row.version,
+        'label': version_row.label,
+        'published_by_email': version_row.published_by_email,
+        'published_at': version_row.published_at.isoformat(),
+        'session_count': len(bookings),
+    }
+
+
+@router.get('/institutions/{institution_id}/timetable/versions')
+def list_timetable_versions(
+    institution_id: int,
+    current_user: User = Depends(require_roles(*SCHEDULE_MANAGERS)),
+    session: Session = Depends(get_session),
+) -> list[dict[str, Any]]:
+    """Published versions of the tenant's timetable, newest first.
+
+    Visible to the same staff roles that may read the full timetable;
+    students never see institution-wide data.
+    """
+    ensure_tenant(current_user, institution_id)
+    rows = session.exec(
+        select(TimetableVersion).where(TimetableVersion.institution_id == institution_id)
+    ).all()
+    return [
+        {
+            'id': row.id,
+            'version': row.version,
+            'label': row.label,
+            'published_by_email': row.published_by_email,
+            'published_at': row.published_at.isoformat(),
+            'session_count': len(json.loads(row.json_payload)),
+        }
+        for row in sorted(rows, key=lambda item: item.version, reverse=True)
+    ]
+
+
+@router.get('/institutions/{institution_id}/timetable/diff')
+def timetable_diff(
+    institution_id: int,
+    current_user: User = Depends(require_roles(*SCHEDULE_MANAGERS)),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    """Diff the current draft against the currently published version.
+
+    Added: sessions booked since the last publish. Removed: sessions the
+    last publish contains that no longer exist. Moved: sessions present in
+    both whose room, day, start time, or duration changed. If nothing was
+    ever published the whole draft counts as added and ``published_version``
+    is null (an honest "nothing to compare against" rather than a fake diff).
+    """
+    ensure_tenant(current_user, institution_id)
+    published_rows = session.exec(
+        select(TimetableVersion).where(TimetableVersion.institution_id == institution_id)
+    ).all()
+    draft = {
+        booking.id: _booking_snapshot(booking)
+        for booking in session.exec(
+            select(SessionBooking).where(SessionBooking.institution_id == institution_id)
+        ).all()
+    }
+
+    if not published_rows:
+        return {
+            'institution_id': institution_id,
+            'published_version': None,
+            'published_label': None,
+            'draft_session_count': len(draft),
+            'added': sorted(draft.values(), key=lambda row: row['id']),
+            'removed': [],
+            'moved': [],
+        }
+
+    latest = max(published_rows, key=lambda row: row.version)
+    published = {row['id']: row for row in json.loads(latest.json_payload)}
+
+    added = [draft[key] for key in draft.keys() - published.keys()]
+    removed = [published[key] for key in published.keys() - draft.keys()]
+    moved = []
+    for session_id in draft.keys() & published.keys():
+        before = published[session_id]
+        after = draft[session_id]
+        changed = any(
+            before[field] != after[field]
+            for field in ('room_id', 'day', 'start_minute', 'duration_minute')
+        )
+        if changed:
+            moved.append({'id': session_id, 'from': before, 'to': after})
+
+    return {
+        'institution_id': institution_id,
+        'published_version': latest.version,
+        'published_label': latest.label,
+        'draft_session_count': len(draft),
+        'added': sorted(added, key=lambda row: row['id']),
+        'removed': sorted(removed, key=lambda row: row['id']),
+        'moved': sorted(moved, key=lambda row: row['id']),
+    }

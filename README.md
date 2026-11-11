@@ -15,6 +15,8 @@ FairSchedule AI is a demo multi-tenant university scheduling system built with F
 - User roles and authorization checks
 - Demo seed data for multiple institutions
 - Timetable generation using OR-Tools CP-SAT
+- Timetable publish workflow: named, versioned snapshots of the institution's
+  timetable with an added/removed/moved diff against the live draft
 - Repair proposal generation and audit log
 - AI assistant stub that works without external keys
 - 3D campus visualization with React Three Fiber: buildings colored by live

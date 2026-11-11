@@ -1,5 +1,11 @@
 // Extended DOM matchers (toBeInTheDocument, toHaveTextContent, ...).
 import '@testing-library/jest-dom/vitest';
+import { configure } from '@testing-library/react';
+
+// Shared CI runners can be slow enough to exceed the 1s default of the
+// findBy* async queries. Allow more wall-clock time without weakening any
+// assertion — every wait still requires the same element to appear.
+configure({ asyncUtilTimeout: 5000 });
 
 // jsdom has no canvas implementation. lottie-web grabs a 2D context from an
 // HTMLCanvasElement at module-load time (before any test body runs), so without

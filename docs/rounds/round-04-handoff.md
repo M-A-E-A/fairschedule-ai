@@ -16,8 +16,8 @@ verified; none may be reintroduced.
 | S-02 | Rate-limiter persistence | done | `bdc36c4` |
 | S-03 | PostgreSQL exercised in CI | done | `dc14dd8` |
 | S-04 | Docker build + container smoke test in CI | done | `8cf3370` |
-| S-05 | 3D campus ↔ schedule integration | done | (this commit) |
-| S-06 | Timetable publish workflow | pending | — |
+| S-05 | 3D campus ↔ schedule integration | done | `fe90cfe` |
+| S-06 | Timetable publish workflow | done | (this commit) |
 | S-07 | CSV import | pending | — |
 | S-08 | ICS calendar export | pending | — |
 | S-09 | Audit timeline UI | pending | — |
@@ -264,6 +264,95 @@ $ npm run build
 (32 tests before this round − 2 replaced + 7 = 37; the main chunk is still
 1,551 kB with the >500 kB warning — three.js — which is exactly S-11's
 mandate, not addressed here.)
+
+**S-05 CI result (run `43049633451` on `fe90cfe`, all four jobs green):**
+https://github.com/M-A-E-A/fairschedule-ai/actions/runs/43049633451
+
+### S-06 — timetable publish workflow (commit: this milestone's)
+
+Draft → published with versioning, plus a draft-vs-published diff, on the
+backend and in the timetable page:
+
+- New table `TimetableVersion` (`app/models/tenant.py`): one row per
+  published version — per-tenant 1-based `version` (unique per institution),
+  `label`, `published_by_email`, wall-clock UTC `published_at`, and an
+  immutable `json_payload` snapshot of the tenant's booking rows (fields
+  only — no joined labels, because a published version is history and must
+  stay meaningful after the referenced rows change or disappear). Alembic
+  migration `c4f8a1d2e6b7` (chain is now `72bbb9943009` → `a1c4e7f9d2b3` →
+  `c4f8a1d2e6b7`); `alembic/env.py` imports the model for future
+  autogeneration.
+- `POST /institutions/:id/timetable/publish` — freezes the tenant's current
+  bookings as the next named version and records a `timetable_published`
+  audit event. RBAC: `PROPOSAL_APPROVERS` (administrator, campus operator)
+  — the same human-in-the-loop boundary as proposal approval. Blank label
+  falls back to `Version N`.
+- `GET /institutions/:id/timetable/versions` — published versions newest
+  first (id, version, label, publisher, timestamp, session count); staff
+  (`SCHEDULE_MANAGERS`) only, like the timetable itself.
+- `GET /institutions/:id/timetable/diff` — added / removed / moved sessions
+  between the live draft and the latest published version, keyed by booking
+  id (moved = room/day/start/duration change, reported with `from`/`to`).
+  Never-published tenants get the honest `published_version: null` with the
+  whole draft as added. Both endpoints are tenant-checked.
+- Frontend (`TimetablePage`): a "Published versions" panel listing versions,
+  a publish form (label + button) shown only to `PROPOSAL_APPROVER_ROLES`
+  (faculty see versions and diffs but never a publish button), and a
+  draft-vs-published summary with per-session change rows. Publishing
+  prepends the new version and refetches the diff.
+- Tests: `backend/tests/test_timetable_publish.py` (8) — publish freezes a
+  named version with an audit event, default label, staff-only
+  versions/diff, approvers-only publish (faculty and student refused),
+  cross-tenant publish refused, empty diff right after publishing,
+  added/moved/removed each observed and correctly classified (including
+  that deleting a session the publish contains stays `removed`), and the
+  never-published shape. Frontend: TimetablePage versions+diff rendering
+  without a publish button for faculty, and administrator publish flow
+  (POST payload asserted, new version prepended, diff refetched) — 2 new
+  component tests; the pre-existing tests were updated to stub the two new
+  endpoints (the fetch stub matches by substring, so the specific routes
+  must be registered before the timetable prefix).
+
+Raw local gate output (backend):
+
+```
+$ python -m ruff check .
+All checks passed!
+
+$ python -m pytest -q
+135 passed, 1 warning in 50.85s
+```
+
+(127 after S-04 + 8 new S-06 tests.)
+
+Raw local gate output (frontend):
+
+```
+$ npm run lint
+> fairschedule-ai-frontend@0.1.0 lint
+> eslint .
+
+(0 errors; the same 3 pre-existing react-refresh warnings as before)
+
+$ npm run test -- --run
+Test Files  12 passed (12)
+     Tests  39 passed (39)
+
+$ npm run build
+✓ built in 1.04s
+```
+
+(37 after S-05 + 2 new TimetablePage tests.)
+
+While re-verifying the gates before committing, one full-suite run flaked:
+`renders the institution timetable for staff` hit the 1 s default of
+`findByRole` on a loaded dev machine (jsdom startup was 48% of the run) and
+the page was still in its loading state when the query timed out; the same
+file passed in isolation and the full suite passed on re-run. To keep shared
+CI runners from tripping the same 1 s limit, `setupTests.ts` now sets
+`configure({ asyncUtilTimeout: 5000 })` — every `findBy*` still requires
+exactly the same element to appear, only the wall-clock allowance changed.
+
 
 ## Interim failures
 

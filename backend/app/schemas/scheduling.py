@@ -59,6 +59,11 @@ class BookingUpdateRequest(BaseModel):
     status: str | None = None
 
 
+class TimetablePublishRequest(BaseModel):
+    # Human name for the published version; blank falls back to "Version N".
+    label: str = Field(default='', max_length=120)
+
+
 class ScheduleProposalRequest(BaseModel):
     institution_id: int
     summary: str

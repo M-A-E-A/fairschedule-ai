@@ -6,6 +6,8 @@ export type Role = 'administrator' | 'campus_operator' | 'faculty' | 'student';
 export const STAFF_ROLES: Role[] = ['administrator', 'campus_operator', 'faculty'];
 /** Roles that may allocate rooms (mirrors backend ROOM_MANAGERS). */
 export const ROOM_MANAGER_ROLES: Role[] = ['administrator', 'campus_operator'];
+/** Roles that may approve proposals and publish timetables (mirrors backend PROPOSAL_APPROVERS). */
+export const PROPOSAL_APPROVER_ROLES: Role[] = ['administrator', 'campus_operator'];
 
 export interface AuthToken {
   access_token: string;
@@ -81,6 +83,40 @@ export interface ScheduleResponse {
 export interface TimetableResponse {
   institution_id: number;
   sessions: ScheduleSession[];
+}
+
+/** One published timetable version (GET /institutions/:id/timetable/versions). */
+export interface TimetableVersionEntry {
+  id: number;
+  version: number;
+  label: string;
+  published_by_email: string;
+  published_at: string;
+  session_count: number;
+}
+
+/** A booking row frozen inside a published version / diff (fields only). */
+export interface BookingSnapshotRow {
+  id: number;
+  campus_id: number;
+  course_id: number;
+  lecturer_id: number;
+  student_group_id: number;
+  room_id: number;
+  day: number;
+  start_minute: number;
+  duration_minute: number;
+  status: string;
+}
+
+export interface TimetableDiffResponse {
+  institution_id: number;
+  published_version: number | null;
+  published_label: string | null;
+  draft_session_count: number;
+  added: BookingSnapshotRow[];
+  removed: BookingSnapshotRow[];
+  moved: { id: number; from: BookingSnapshotRow; to: BookingSnapshotRow }[];
 }
 
 export interface AdminUser {

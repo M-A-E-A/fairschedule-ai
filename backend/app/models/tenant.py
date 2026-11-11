@@ -129,6 +129,30 @@ class AuditEvent(SQLModel, table=True):
     message: str
 
 
+class TimetableVersion(SQLModel, table=True):
+    """A named, frozen snapshot of a tenant's published timetable (S-06).
+
+    Publishing copies the institution's current booking rows into
+    ``json_payload``; later draft edits never rewrite a stored version, so any
+    published version stays queryable exactly as it was published (the diff
+    endpoint compares the live draft against the latest one). ``version`` is
+    a per-tenant 1-based sequence assigned at publish time, unique per
+    institution.
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    institution_id: int = Field(foreign_key='institution.id', index=True)
+    version: int
+    label: str
+    published_by_email: str
+    published_at: datetime
+    json_payload: str
+
+    __table_args__ = (
+        Index('uq_timetableversion_inst_version', 'institution_id', 'version', unique=True),
+    )
+
+
 class LoginAttempt(SQLModel, table=True):
     """One failed password-login attempt (S-02: brute-force throttling store).
 

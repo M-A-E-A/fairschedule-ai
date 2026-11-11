@@ -11,6 +11,7 @@ from app.models.tenant import (
     ScheduleProposal,
     SessionBooking,
     StudentGroup,
+    TimetableVersion,
     User,
 )
 
@@ -27,5 +28,6 @@ __all__ = [
     'ScheduleProposal',
     'SessionBooking',
     'StudentGroup',
+    'TimetableVersion',
     'User',
 ]
