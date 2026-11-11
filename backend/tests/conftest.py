@@ -1,9 +1,16 @@
 """Shared test fixtures.
 
 The environment is pinned to a dedicated SQLite database *before* the app is
-imported, so tests never touch a developer's demo database. The file is
-deleted on every session start: schema changes always come from a fresh
-``alembic upgrade head``, which is exactly what production runs.
+imported, so tests never touch a developer's demo database. The schema always
+comes from ``alembic upgrade head``, which is exactly what production runs:
+the conftest applies it once at import time (so auth-infrastructure tables
+exist even for tests that never boot the app's lifespan) and the app's
+lifespan re-applies it as a no-op.
+
+An explicit ``DATABASE_URL`` environment variable is respected instead of the
+SQLite default — this is how the CI PostgreSQL job points the same suite at
+a real ``postgres:16`` service (S-03). With no ``DATABASE_URL`` set, the
+local default stays exactly as before: a throwaway SQLite file.
 """
 
 from __future__ import annotations
@@ -14,32 +21,44 @@ import pathlib
 _BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
 _TEST_DB = _BACKEND_DIR / 'fairschedule_test.db'
 
-os.environ['DATABASE_URL'] = 'sqlite:///./fairschedule_test.db'
+if 'DATABASE_URL' not in os.environ:
+    os.environ['DATABASE_URL'] = 'sqlite:///./fairschedule_test.db'
 os.environ.setdefault('APP_ENV', 'test')
 os.environ.setdefault('JWT_SECRET', 'test-only-secret-do-not-use-in-production')
 
-if _TEST_DB.exists():
+if os.environ['DATABASE_URL'].startswith('sqlite') and _TEST_DB.exists():
+    # Fresh file per run: schema changes always come from a fresh
+    # ``alembic upgrade head``. (Only meaningful for the SQLite default;
+    # a PostgreSQL URL owns its own lifecycle in CI.)
     _TEST_DB.unlink()
 
 import pytest  # noqa: E402
+from app.core.db import engine  # noqa: E402
+from app.core.migrations import run_migrations  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services.rate_limit import login_rate_limiter  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
+from sqlmodel import Session  # noqa: E402
+
+# Apply the migration chain once, before any test or fixture can touch the
+# database. The app lifespan's own run_migrations() is then a no-op upgrade.
+run_migrations()
 
 
 @pytest.fixture(autouse=True)
 def _fresh_login_throttle():
-    """Start every test with an empty login-failure counter.
+    """Start every test with an empty login-failure store.
 
-    The rate limiter is module-level state shared by the whole session, and
-    the client fixture is session-scoped; without this reset, failures
-    recorded in one test could lock an account out in a later, unrelated
-    test. Tests that exercise the lockout itself build up their own counts
-    inside their own body.
+    The throttle state lives in the database (S-02), shared by the whole
+    test session; without this reset, failures recorded in one test could
+    lock an account out in a later, unrelated test. Tests that exercise the
+    lockout itself build up their own counts inside their own body.
     """
-    login_rate_limiter.reset()
+    with Session(engine) as session:
+        login_rate_limiter.reset(session)
     yield
-    login_rate_limiter.reset()
+    with Session(engine) as session:
+        login_rate_limiter.reset(session)
 
 
 @pytest.fixture(scope='session')

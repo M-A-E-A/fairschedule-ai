@@ -27,6 +27,7 @@ from app.models import (  # noqa: E402, F401  # noqa: E402, F401
     Department,
     Institution,
     Lecturer,
+    LoginAttempt,
     Room,
     ScheduleProposal,
     SessionBooking,

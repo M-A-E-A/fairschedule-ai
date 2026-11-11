@@ -50,7 +50,7 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
     """
     client_ip = request.client.host if request.client else 'unknown'
     throttle_key = (client_ip, (payload.username or str(payload.email)).lower())
-    wait_seconds = login_rate_limiter.locked_for(throttle_key)
+    wait_seconds = login_rate_limiter.locked_for(session, throttle_key)
     if wait_seconds > 0:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -65,11 +65,11 @@ def login(payload: LoginRequest, request: Request, session: Session = Depends(ge
     stored_hash = user.password_hash if user is not None and user.password_hash else DUMMY_PASSWORD_HASH
     password_ok = verify_password(payload.password, stored_hash)
     if user is None or not user.password_hash or not password_ok:
-        login_rate_limiter.record_failure(throttle_key)
+        login_rate_limiter.record_failure(session, throttle_key)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='invalid credentials')
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='account disabled')
-    login_rate_limiter.record_success(throttle_key)
+    login_rate_limiter.record_success(session, throttle_key)
     return _issue_token(user)
 
 

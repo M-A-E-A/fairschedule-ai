@@ -2,10 +2,17 @@
 
 Every institution is a tenant. All business tables carry ``institution_id``
 so that tenant isolation can be enforced in every query.
+
+``LoginAttempt`` is the one auth-infrastructure table without a tenant
+column: it records password-login *failures* keyed by the identifier the
+client attempted, which exists before authentication resolves a tenant.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
+
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel
 
 
@@ -120,3 +127,27 @@ class AuditEvent(SQLModel, table=True):
     user_email: str
     event_type: str
     message: str
+
+
+class LoginAttempt(SQLModel, table=True):
+    """One failed password-login attempt (S-02: brute-force throttling store).
+
+    Rows live in the application database so every worker and replica of a
+    deployment counts the same sliding window, and a fresh process inherits
+    the failures recorded before it started. ``client_ip`` plus ``identifier``
+    (the username *or* email the client attempted, lower-cased by the
+    caller) is the throttle key; ``identifier`` deliberately needs to resolve
+    to no account — unknown and known accounts must throttle identically.
+    ``failed_at`` is wall-clock UTC because the window must survive process
+    restarts (a monotonic clock would reset with each process).
+    """
+
+    id: int | None = Field(default=None, primary_key=True)
+    client_ip: str
+    identifier: str
+    failed_at: datetime
+
+    __table_args__ = (
+        Index('ix_loginattempt_key', 'client_ip', 'identifier'),
+        Index('ix_loginattempt_failed_at', 'failed_at'),
+    )

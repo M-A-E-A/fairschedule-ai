@@ -12,8 +12,8 @@ verified; none may be reintroduced.
 
 | Item | Title | Status | Commit |
 |------|-------|--------|--------|
-| S-01 | Solver time limit | done | (this commit) |
-| S-02 | Rate-limiter persistence | pending | — |
+| S-01 | Solver time limit | done | `3f48122` |
+| S-02 | Rate-limiter persistence | done | (this commit) |
 | S-03 | PostgreSQL exercised in CI | pending | — |
 | S-04 | Docker build + container smoke test in CI | pending | — |
 | S-05 | 3D campus ↔ schedule integration | pending | — |
@@ -80,6 +80,56 @@ $ python -m pytest -q
 (115 tests before this round + 6 new S-01 tests; the 1 warning is the known
 anyio `BlockingPortal` DeprecationWarning from starlette's TestClient, present
 since round 1.)
+
+### S-02 — rate-limiter persistence (commit: this milestone's)
+
+The in-memory `defaultdict` failure store was replaced by the `loginattempt`
+database table, so every worker/replica of a deployment counts the same
+sliding window and a fresh process inherits previously recorded failures:
+
+- New SQLModel table `LoginAttempt` (`client_ip`, `identifier`, wall-clock
+  `failed_at`, composite index on the key, index on `failed_at`) in
+  `app/models/tenant.py`, created by Alembic migration `a1c4e7f9d2b3`
+  (chained after `72bbb9943009`); `alembic/env.py` imports the model so
+  future autogeneration sees it.
+- `LoginRateLimiter` methods now take the request's `Session`; every operation
+  commits its own transaction — a failed login raises `HTTPException` *after*
+  recording the failure, and an uncommitted row would be rolled back when the
+  request session closes. Wall-clock UTC timestamps (naive, so they
+  round-trip identically on SQLite and PostgreSQL) replace `time.monotonic()`,
+  which resets per process and would break exactly the property the
+  persistent store exists for.
+- Sliding-window semantics, key shape `(client IP, attempted identifier)`,
+  unknown/known-account equivalence, and the R-014 dummy-hash timing
+  equalization are unchanged; `app/api/auth.py` only passes its existing
+  session into the limiter calls.
+- Expired attempts are pruned globally on every operation
+  (`failed_at <= now - window`), so the table cannot grow unboundedly.
+- `tests/conftest.py` applies `alembic upgrade head` once at import (the
+  lifespan re-applies it as a no-op) so the throttle table exists even for
+  tests that never boot the app, and the `_fresh_login_throttle` autouse
+  fixture now clears the table through a real session. It also now respects
+  an explicit `DATABASE_URL` environment variable instead of forcing SQLite —
+  the hook S-03's CI job uses (local SQLite default unchanged).
+- New tests: `backend/tests/test_rate_limit_persistence.py` — lockout
+  survives a fresh `LoginRateLimiter` instance (directly and end-to-end via
+  HTTP with the module's limiter swapped), failures are shared between two
+  concurrent instances (two workers), expired attempts are pruned and do not
+  count, the window slides to unlock, and success deletes the rows. The
+  six R-014 tests in `tests/test_login_throttle.py` pass **unchanged**
+  (`git diff` shows no modification to that file).
+
+Raw local gate output (backend):
+
+```
+$ python -m ruff check .
+All checks passed!
+
+$ python -m pytest -q
+127 passed, 1 warning in 35.81s
+```
+
+(121 after S-01 + 6 new S-02 tests.)
 
 ## Interim failures
 
