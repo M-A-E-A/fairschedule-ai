@@ -40,7 +40,7 @@ Protocol: [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).
 | R-012 | `@react-three/drei` declared but never imported | round 1 (review) | resolved | removed from `package.json` and lockfile; no source imports existed; three-mesh-bvh deprecation warning gone from CI (`f413d85`). |
 | R-013 | Frontend tree reports 18 known vulnerabilities | round 1 (review) | resolved | toolchain upgraded (router 7, vite 8, vitest 5, plugin-react 5, `@types/three`), lockfile regenerated; `minimatch` pinned to patched `^11.0.5` via override (npm's suggested fix is a breaking eslint downgrade; without the override GHSA-g3hv-75wg-m249 resurfaces); `npm audit` = 0 vulnerabilities (was 18); `npm audit --audit-level=high` added as a CI gate (`f413d85`, `b735b90`). |
 | R-014 | No rate limiting on login; enumeration timing side channel | round 1 (review) | resolved | dummy-hash bcrypt verification equalizes every 401; sliding-window per-(IP, identifier) lockout — 5 failures / 15 min → `429` + `Retry-After`, identical for unknown accounts; success resets; 6 tests (`2394eb6`). |
-| R-015 | Backend image missing `alembic.ini`/`alembic/` — boots only under Compose's bind mount | round 2 (review) | open | Found by round-2 review: `backend/Dockerfile` copies only `requirements.txt` and `app/`, but startup runs `run_migrations()`, which needs `BACKEND_ROOT/alembic.ini` and `BACKEND_ROOT/alembic`. Works under Compose only because `./backend:/app` is bind-mounted over the image. Fix: add `COPY alembic.ini ./` and `COPY alembic ./alembic` to `backend/Dockerfile` (both already in the build context; `.dockerignore` does not exclude them). |
+| R-015 | Backend image missing `alembic.ini`/`alembic/` — boots only under Compose's bind mount | round 2 (review) | resolved | `backend/Dockerfile` gained `COPY alembic.ini ./` and `COPY alembic ./alembic` (exactly the review's fix); `.dockerignore` tightened to `**/__pycache__`/`**/*.pyc` so the new layer cannot drag nested dev caches into the image; static regression guard `backend/tests/test_docker_image.py` pins the wiring and was proven to fail on the pre-fix Dockerfile. Image not built/run — Docker is not installed on this machine; statically verified only (`89c7547`). |
 
 ## Round log
 
@@ -185,3 +185,38 @@ tenant-leaking endpoint, a stubbed SSO path, and no `frontend/Dockerfile` despit
   documented stack work, and the missing execution R-009 asked for is exactly why it
   went unnoticed. The fix is two static `COPY` lines, no Docker needed. Full detail:
   [`docs/rounds/round-02-review.md`](docs/rounds/round-02-review.md).
+
+### Round 3
+
+- **Developer:** delivered `89c75471719fecd944e3c1908a09acb38145e14b` (handoff:
+  [`docs/rounds/round-03-handoff.md`](docs/rounds/round-03-handoff.md)) — the single
+  round-2 finding R-015 implemented exactly as specified.
+  - **R-015** (`89c7547`): `backend/Dockerfile` now `COPY`s `alembic.ini` and the
+    `alembic/` migration chain into the image, so startup's unconditional
+    `run_migrations()` finds `/app/alembic.ini` and `/app/alembic` outside Compose;
+    the `./backend:/app` bind mount is now a dev convenience, not a load-bearing
+    mask. `.dockerignore` patterns tightened to `**/__pycache__` / `**/*.pyc`
+    because Docker's patterns are root-anchored — without that, the new
+    `COPY alembic` layer would drag `alembic/__pycache__/` and
+    `alembic/versions/__pycache__/` from developer machines into the image.
+  - **Regression guard added** (`backend/tests/test_docker_image.py`, 2 tests):
+    resolves the paths `build_alembic_config()` actually reads, asserts they exist
+    in the build context, and parses the Dockerfile's COPY instructions to assert
+    both artifacts are copied into the image. **Proven not a tautology**: run against
+    the genuine pre-fix Dockerfile (`git checkout b196f1e -- backend/Dockerfile`,
+    then restored), it fails with "Dockerfile does not COPY ['alembic',
+    'alembic.ini'] into the image". Backend tests 113 → **115**.
+  - **Docker was still never executed** — not installed on this machine; the image
+    was neither built nor run. R-015 was verified statically (five-link evidence
+    chain in the handoff: lifespan → `BACKEND_ROOT` resolution → COPY placement →
+    `.dockerignore` non-exclusion → Compose/image agreement). A CI
+    `docker build` step was considered and deliberately not added (cannot be run
+    locally here; reasons in handoff section 9).
+  - Gates all green, local = CI (run `42937728527`, green, on `89c7547` exactly):
+    Ruff **All checks passed!**, pytest **115 passed** (local 1 warning vs CI's 2 —
+    the same disclosed Linux-only passlib `crypt` notice), ESLint clean, Vitest
+    **12 files / 32 tests**, audit **0 vulnerabilities**, build green with asset
+    hashes `index-SvLVliAF.css` / `index-BrSS0O_p.js` identical local and CI.
+  - All 14 prior findings verified still resolved in the current tree (delta from
+    `b735b90` touches only the three R-015 files plus docs; each resolution's key
+    invariant re-spot-checked).
