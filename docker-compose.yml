@@ -16,7 +16,10 @@ services:
     depends_on:
       - db
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/fairschedule
+      # psycopg (v3) is the only PostgreSQL driver installed, so the URL must
+      # name it explicitly — a bare postgresql:// URL would try to load
+      # psycopg2, which is not installed.
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/fairschedule
       APP_ENV: development
       # The browser's Origin header on cross-origin API calls from the
       # published frontend (http://localhost:5173). "frontend" is a name on

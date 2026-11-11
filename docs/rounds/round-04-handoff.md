@@ -13,7 +13,8 @@ verified; none may be reintroduced.
 | Item | Title | Status | Commit |
 |------|-------|--------|--------|
 | S-01 | Solver time limit | done | `3f48122` |
-| S-02 | Rate-limiter persistence | done | (this commit) |
+| S-02 | Rate-limiter persistence | done | `bdc36c4` |
+| S-03 | PostgreSQL exercised in CI | done (CI verification pending below) | (this commit) |
 | S-03 | PostgreSQL exercised in CI | pending | — |
 | S-04 | Docker build + container smoke test in CI | pending | — |
 | S-05 | 3D campus ↔ schedule integration | pending | — |
@@ -130,6 +131,40 @@ $ python -m pytest -q
 ```
 
 (121 after S-01 + 6 new S-02 tests.)
+
+### S-03 — PostgreSQL exercised in CI (commit: this milestone's)
+
+- New CI job **Backend (PostgreSQL 16)** in `.github/workflows/ci.yml`: a
+  `postgres:16` service container with health checks, `pip install` of the
+  backend requirements, an explicit `alembic upgrade head` against the
+  service, then the full `pytest -q` suite with `DATABASE_URL` pointing at
+  it. The existing `backend`/`frontend` jobs are byte-identical to before.
+- `tests/conftest.py` (changed under S-02) respects an explicit
+  `DATABASE_URL` environment variable; with none set the local default is
+  exactly the old throwaway SQLite file.
+- Driver finding while wiring this up (the dialect-specific class of issue
+  this job exists to catch, found statically before the first run): only
+  `psycopg` (v3) is installed — `psycopg2` is not — so SQLAlchemy URLs must
+  use the `postgresql+psycopg://` scheme. A bare `postgresql://` URL raises
+  `Can't load plugin: sqlalchemy.dialects:postgresql:psycopg2`. Fixed in the
+  CI job env, `docker-compose.yml` (whose `DATABASE_URL` could never have
+  worked with the installed driver — the stack has never been executed, per
+  the R-009/R-015 disclosure), and `.env.example`; README documents the
+  scheme. The full migration chain (`72bbb9943009` → `a1c4e7f9d2b3`) now runs
+  against a real PostgreSQL server in this job.
+- **Not run locally** — no PostgreSQL server on the development machine; this
+  job is CI-only by the scope doc's exemption. Local SQLite gates:
+
+```
+$ python -m ruff check .
+All checks passed!
+
+$ python -m pytest -q
+127 passed, 1 warning in 35.81s
+```
+
+CI result for the new job on this commit: recorded in the Interim failures /
+final sections below once observed.
 
 ## Interim failures
 

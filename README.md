@@ -32,7 +32,9 @@ python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 `DATABASE_URL` defaults to SQLite (`sqlite:///./demo.db`) for local runs; set it to a
-PostgreSQL URL when using the Compose `db` service. After editing models, create a
+PostgreSQL URL when using the Compose `db` service (use the
+`postgresql+psycopg://…` scheme — psycopg 3 is the installed driver). After editing
+models, create a
 migration with `alembic revision --autogenerate -m "describe change"` and re-run
 `alembic upgrade head`.
 
@@ -92,6 +94,11 @@ cd backend
 python -m pytest -q
 python -m ruff check .
 ```
+
+The suite pins itself to a throwaway SQLite database unless `DATABASE_URL` is set
+in the environment — with it set (for example to a `postgresql+psycopg://…` URL)
+the same suite runs against that database, applying `alembic upgrade head` first.
+That is exactly what the CI "Backend (PostgreSQL 16)" job does.
 
 Frontend:
 

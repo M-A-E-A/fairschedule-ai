@@ -20,6 +20,45 @@ jobs:
       - name: Test (pytest)
         run: cd backend && pytest -q
 
+  # S-03: exercise the Alembic migration chain and the backend suite against a
+  # real PostgreSQL server. The development machine has no PostgreSQL, so this
+  # job is the only place it runs (scope doc: CI-only by design/exempt from the
+  # local/CI symmetry requirement). DATABASE_URL is set explicitly, which
+  # tests/conftest.py respects instead of its local SQLite default.
+  postgres:
+    name: Backend (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fairschedule_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # psycopg (v3) is the installed driver, so the URL must name it;
+      # a bare postgresql:// URL would try to load psycopg2, which is not
+      # installed.
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/fairschedule_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r backend/requirements.txt
+      - name: Migrate (Alembic upgrade head)
+        run: cd backend && alembic upgrade head
+      - name: Test (pytest against PostgreSQL)
+        run: cd backend && pytest -q
+
   frontend:
     name: Frontend (lint + test + build)
     runs-on: ubuntu-latest
