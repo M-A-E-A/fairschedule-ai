@@ -59,6 +59,68 @@ jobs:
       - name: Test (pytest against PostgreSQL)
         run: cd backend && pytest -q
 
+  # S-04: build both images with `docker build` and boot them. The development
+  # machine has no Docker, so this job is the only place the images are ever
+  # built and run (scope doc: CI-only by design, exempt from the local/CI
+  # symmetry requirement). The backend runs against a real PostgreSQL service
+  # with the compose-equivalent environment, so startup runs the Alembic
+  # migration chain and the demo seed from inside the image (the R-015
+  # wiring) before /health is asserted.
+  docker:
+    name: Docker (build + container smoke test)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: fairschedule_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the backend image
+        run: docker build -t fairschedule-backend:ci ./backend
+      - name: Run the backend container and assert GET /health returns 200
+        run: |
+          docker run -d --name backend-ci -p 8000:8000 \
+            --add-host=host.docker.internal:host-gateway \
+            -e DATABASE_URL=postgresql+psycopg://postgres:postgres@host.docker.internal:5432/fairschedule_ci \
+            fairschedule-backend:ci
+          for attempt in $(seq 1 45); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/health || true)
+            if [ "$code" = "200" ]; then
+              echo "backend container serves GET /health with 200"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::backend container never served GET /health with 200"
+          docker logs backend-ci
+          exit 1
+      - name: Build the frontend image
+        run: docker build -t fairschedule-frontend:ci ./frontend
+      - name: Run the frontend container and assert the SPA is served
+        run: |
+          docker run -d --name frontend-ci -p 5173:5173 fairschedule-frontend:ci
+          for attempt in $(seq 1 30); do
+            body=$(curl -s http://localhost:5173/ || true)
+            if echo "$body" | grep -q 'id="root"'; then
+              echo "frontend container serves the built SPA"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::frontend container never served the SPA"
+          docker logs frontend-ci
+          exit 1
+
   frontend:
     name: Frontend (lint + test + build)
     runs-on: ubuntu-latest

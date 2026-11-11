@@ -14,7 +14,8 @@ verified; none may be reintroduced.
 |------|-------|--------|--------|
 | S-01 | Solver time limit | done | `3f48122` |
 | S-02 | Rate-limiter persistence | done | `bdc36c4` |
-| S-03 | PostgreSQL exercised in CI | done (CI verification pending below) | (this commit) |
+| S-03 | PostgreSQL exercised in CI | done | `dc14dd8` |
+| S-04 | Docker build + container smoke test in CI | done (CI verification pending below) | (this commit) |
 | S-03 | PostgreSQL exercised in CI | pending | — |
 | S-04 | Docker build + container smoke test in CI | pending | — |
 | S-05 | 3D campus ↔ schedule integration | pending | — |
@@ -165,6 +166,31 @@ $ python -m pytest -q
 
 CI result for the new job on this commit: recorded in the Interim failures /
 final sections below once observed.
+
+**S-03 CI result (run `43047958410` on `dc14dd8`, all jobs green):** the
+*Backend (PostgreSQL 16)* job passed on the first push — `alembic upgrade head`
+applied both revisions to the `postgres:16` service, then the suite reported
+`127 passed, 2 warnings in 20.69s` (the second warning is the disclosed
+Linux-only passlib `crypt` notice, matching rounds 1–3; local SQLite runs
+report 1 warning for the same reason). No dialect-specific failures were
+found on the first run: the psycopg URL scheme issue was caught statically
+before the push (documented above). Run URL:
+https://github.com/M-A-E-A/fairschedule-ai/actions/runs/43047958410
+
+### S-04 — Docker build + container smoke test in CI (commit: this milestone's)
+
+- New CI job **Docker (build + container smoke test)**: `docker build` of both
+  images (`./backend`, `./frontend`), then each container is run and asserted:
+  the backend container boots against a real `postgres:16` service with the
+  compose-equivalent `DATABASE_URL` (via
+  `--add-host=host.docker.internal:host-gateway`), so startup runs the Alembic
+  migration chain and demo seed *from inside the image* — the exact R-015
+  wiring — and `GET /health` must return 200 within the retry window; the
+  frontend container must serve the built SPA (`id="root"` in the response
+  body). Failures dump `docker logs` before exiting non-zero.
+- **Not run locally** — no Docker on the development machine; CI-only per the
+  scope doc's exemption. Local gates unchanged (ruff/pytest backend, and the
+  frontend gates below from S-05 onward).
 
 ## Interim failures
 
