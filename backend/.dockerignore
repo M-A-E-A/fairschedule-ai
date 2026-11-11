@@ -1,8 +1,11 @@
 # Keep the build context small: the virtualenv, caches, and local SQLite
-# files are never needed inside the image.
+# files are never needed inside the image. Patterns are anchored at the
+# context root, so nested caches need the ** form: alembic/ and
+# alembic/versions/ carry their own __pycache__ on developer machines and
+# must not ride along in the `COPY alembic` layer.
 .venv
-__pycache__
-*.pyc
+**/__pycache__
+**/*.pyc
 *.db
 .pytest_cache
 .ruff_cache
