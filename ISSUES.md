@@ -243,3 +243,30 @@ tenant-leaking endpoint, a stubbed SSO path, and no `frontend/Dockerfile` despit
   Docker-capable machine should run `docker compose up --build` plus a standalone
   `docker run` boot check (R-009/R-015 execution half). Full detail:
   [`docs/rounds/round-03-review.md`](docs/rounds/round-03-review.md).
+
+### Round 4 (scope extension)
+
+- **Project owner:** approved a 13-item scope extension on 2026-11-11, reopening the loop
+  after the round-3 `APPROVE`. The mandate is
+  [`docs/rounds/round-04-scope.md`](docs/rounds/round-04-scope.md) — items **S-01 through
+  S-13** in three tiers, implemented in tier order:
+  - **Tier 1 — close the gap between green checks and a working system:** S-01 solver
+    time limit, S-02 rate-limiter persistence, S-03 PostgreSQL exercised in CI,
+    S-04 Docker build + container smoke test in CI.
+  - **Tier 2 — product depth:** S-05 3D campus ↔ schedule integration, S-06 timetable
+    publish workflow (versioning + diff), S-07 CSV import, S-08 ICS calendar export,
+    S-09 audit timeline UI, S-10 solver metrics dashboard.
+  - **Tier 3 — engineering polish:** S-11 route-level code splitting, S-12 Playwright
+    E2E smoke tests, S-13 coverage and mypy gates.
+- Scope items carry `S-NN` IDs so they never collide with finding IDs (`R-NNN` continues
+  from **R-016**). They are requirements, not findings: the Developer implements them
+  against the scope doc's acceptance criteria, and the Reviewer audits that
+  implementation, opening `R-NNN` rows only for genuine defects — unimplemented or
+  wrongly implemented items, plus anything new the changes introduce.
+- **CI-only exemption (by design):** Docker, Redis, and a local PostgreSQL server are
+  unavailable on the development machine, so S-03 and S-04 add CI jobs that execute only
+  on GitHub's runners. Those jobs are exempt from the local/CI-symmetry requirement;
+  every other check must still pass identically locally and in CI.
+- **Standing constraint:** `R-001`–`R-015` must remain resolved; none may be reintroduced.
+  The scope doc, protocol, and prompts are orchestrator-maintained; agents record
+  concerns about them here rather than editing them.
