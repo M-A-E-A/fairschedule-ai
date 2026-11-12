@@ -17,6 +17,8 @@ FairSchedule AI is a demo multi-tenant university scheduling system built with F
 - Timetable generation using OR-Tools CP-SAT
 - Timetable publish workflow: named, versioned snapshots of the institution's
   timetable with an added/removed/moved diff against the live draft
+- CSV import for institution data (rooms, courses, lecturers, student groups)
+  with all-or-nothing, per-row validation errors
 - Repair proposal generation and audit log
 - AI assistant stub that works without external keys
 - 3D campus visualization with React Three Fiber: buildings colored by live
@@ -69,6 +71,35 @@ The frontend image is a multi-stage build (`npm run build`, then nginx serving
 the static bundle with SPA fallback routing); the backend runs against the
 Compose Postgres service. The backend generates an ephemeral JWT secret per
 process (`APP_ENV=development`), so no secret is committed for the stack.
+
+## CSV import (institution data)
+
+`POST /institutions/{id}/import/{dataset}` accepts a UTF-8 CSV file
+(multipart field `file`) for one of `rooms`, `courses`, `lecturers`, or
+`student-groups` and applies it **all-or-nothing**: every row is validated
+first, so a single bad row imports nothing. A rejected file returns `400`
+listing *every* failing row with its row number as it appears in the file
+(header = row 1) and the reason.
+
+| dataset         | required columns          | optional columns               |
+|-----------------|---------------------------|--------------------------------|
+| `rooms`         | `campus_id,name,capacity` | `room_type,equipment`          |
+| `courses`       | `code,name`               | `required_room_type`           |
+| `lecturers`     | `name,email`              | —                              |
+| `student-groups`| `name,size`               | —                              |
+
+Requires an administrator or campus-operator bearer token, and rows are only
+ever written into the caller's own institution — another tenant's institution
+id is refused with `403`, and a campus id outside the tenant is a per-row
+error. Parsing uses the Python standard library `csv` module; no extra
+dependencies. Every successful import records a `csv_import` audit event.
+
+```bash
+# rooms.csv: campus_id,name,capacity,room_type,equipment
+curl -X POST http://localhost:8000/institutions/1/import/rooms \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@rooms.csv"
+```
 
 ## Demo credentials
 

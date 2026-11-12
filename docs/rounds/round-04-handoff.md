@@ -17,8 +17,8 @@ verified; none may be reintroduced.
 | S-03 | PostgreSQL exercised in CI | done | `dc14dd8` |
 | S-04 | Docker build + container smoke test in CI | done | `8cf3370` |
 | S-05 | 3D campus ↔ schedule integration | done | `fe90cfe` |
-| S-06 | Timetable publish workflow | done | (this commit) |
-| S-07 | CSV import | pending | — |
+| S-06 | Timetable publish workflow | done | `d2429a0` |
+| S-07 | CSV import | done | (this commit) |
 | S-08 | ICS calendar export | pending | — |
 | S-09 | Audit timeline UI | pending | — |
 | S-10 | Solver metrics dashboard | pending | — |
@@ -353,6 +353,66 @@ CI runners from tripping the same 1 s limit, `setupTests.ts` now sets
 `configure({ asyncUtilTimeout: 5000 })` — every `findBy*` still requires
 exactly the same element to appear, only the wall-clock allowance changed.
 
+
+### S-07 — CSV import (commit: this milestone's)
+
+Bulk-loading of institution data, all-or-nothing, with row-level diagnostics:
+
+- New endpoint `POST /institutions/{id}/import/{dataset}` (`app/api/csv_imports.py`)
+  for `rooms`, `courses`, `lecturers`, and `student-groups` (the scope's
+  minimum of rooms and courses plus the two datasets its motivation names).
+  The file arrives as a multipart upload (field `file`) and is parsed with the
+  **standard library `csv` module only** — no new dependencies (`python-multipart`
+  was already a pinned dependency for FastAPI form handling).
+- **All-or-nothing:** every row is validated before a single INSERT; any
+  failure raises `400` with `detail.message` ("N row(s) failed validation;
+  nothing was imported") and `detail.errors` = *every* failing row as
+  `{row, reason}`, where `row` is the physical line number in the file
+  (header = row 1, taken from `csv.reader.line_num`). Nothing is added to the
+  session on the failure path, so the request's rollback guarantees no
+  partial import. Success commits all rows in one transaction plus a
+  `csv_import` audit event.
+- Row validation per dataset: value types and ranges (`capacity` 1–10000,
+  `size` 1–100000), required fields, tenant-owned references (a `campus_id`
+  outside the institution is a row error), email syntax for lecturers
+  (syntax-only, `check_deliverability=False` — no network calls in
+  validation), and duplicates both inside the file and against existing
+  tenant rows (room name per campus, course code, lecturer email, group
+  name). Missing required header columns are a row-1 error; a header-only
+  file is refused; a UTF-8 BOM (Excel) is tolerated; non-UTF-8 input is a
+  reported error. Extra columns are ignored; optional columns default to the
+  model defaults.
+- **Role gating:** `ROOM_MANAGERS` (administrator, campus operator) only —
+  faculty and students get 403, unauthenticated 401. **Tenant scoping:**
+  `ensure_tenant` refuses another tenant's institution id with `403
+  tenant mismatch` before the file is read.
+- Documented in the README (feature bullet + a "CSV import" section with the
+  per-dataset column table, the security semantics, and a curl example).
+- Tests (`backend/tests/test_csv_import.py`, 13): valid rooms file (rows
+  created + audit event), valid courses file, a bad-rows file asserting
+  **every** error is reported (rows 3/4/5 each with its reason) **and**
+  nothing was imported (not even the valid row), duplicate-inside-file,
+  missing header column, header-only file, lecturers + student-groups,
+  invalid email, cross-tenant rejection (403 + target tenant unchanged),
+  faculty/student 403, operator allowed, unauthenticated 401, unknown dataset
+  404. A module-scoped teardown deletes every imported row so the exact seeded
+  counts other modules assert (e.g. `north['rooms'] == 4`) stay true — import
+  tests run before `test_dashboard_ai` alphabetically, and the cleanup makes
+  that ordering irrelevant anyway.
+
+Raw local gate output (backend):
+
+```
+$ python -m ruff check .
+All checks passed!
+
+$ python -m pytest -q
+148 passed, 1 warning in 55.37s
+```
+
+(135 after S-06 + 13 new S-07 tests; the 1 warning is the known anyio
+`BlockingPortal` DeprecationWarning from starlette's TestClient, present
+since round 1.)
 
 ## Interim failures
 

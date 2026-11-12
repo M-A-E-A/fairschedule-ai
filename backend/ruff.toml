@@ -19,14 +19,15 @@ ignore = []
 
 [lint.flake8-bugbear]
 # B008 flags function calls in argument defaults. FastAPI is deliberately
-# designed around `Depends()` / `Security()` / `require_roles()` written in
-# parameter defaults — moving those calls into function bodies would break
-# dependency injection, not fix anything. Ruff's documented mechanism for
-# this exact case is `extend-immutable-calls`, so we declare these three
-# call targets as accepted instead of restructuring working endpoints.
+# designed around `Depends()` / `Security()` / `File()` / `require_roles()`
+# written in parameter defaults — moving those calls into function bodies
+# would break dependency injection, not fix anything. Ruff's documented
+# mechanism for this exact case is `extend-immutable-calls`, so we declare
+# these call targets as accepted instead of restructuring working endpoints.
 extend-immutable-calls = [
     "fastapi.Depends",
     "fastapi.Security",
+    "fastapi.File",
     "app.api.deps.require_roles",
 ]
 

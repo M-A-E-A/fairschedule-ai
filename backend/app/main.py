@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, ai, auth, bookings, dashboard, rooms, scheduling
+from app.api import admin, ai, auth, bookings, csv_imports, dashboard, rooms, scheduling
 from app.core.config import get_settings
 from app.core.db import engine
 from app.core.migrations import run_migrations
@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
         rooms.router,
         bookings.router,
         scheduling.router,
+        csv_imports.router,
         admin.router,
         ai.router,
     ):
