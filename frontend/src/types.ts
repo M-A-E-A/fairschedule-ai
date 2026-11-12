@@ -119,6 +119,14 @@ export interface TimetableDiffResponse {
   moved: { id: number; from: BookingSnapshotRow; to: BookingSnapshotRow }[];
 }
 
+/** One admin-only audit event (GET /audit-events), newest first by id. */
+export interface AuditEvent {
+  id: number;
+  user_email: string;
+  event_type: string;
+  message: string;
+}
+
 export interface AdminUser {
   id: number;
   username: string;

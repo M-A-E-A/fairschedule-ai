@@ -19,8 +19,8 @@ verified; none may be reintroduced.
 | S-05 | 3D campus ↔ schedule integration | done | `fe90cfe` |
 | S-06 | Timetable publish workflow | done | `d2429a0` |
 | S-07 | CSV import | done | `29db218` |
-| S-08 | ICS calendar export | done | (this commit) |
-| S-09 | Audit timeline UI | pending | — |
+| S-08 | ICS calendar export | done | `9778455` |
+| S-09 | Audit timeline UI | done | (this commit) |
 | S-10 | Solver metrics dashboard | pending | — |
 | S-11 | Route-level code splitting | pending | — |
 | S-12 | Playwright E2E smoke tests | pending | — |
@@ -472,6 +472,57 @@ $ python -m pytest -q
 ```
 
 (148 after S-07 + 10 new S-08 tests.)
+
+**S-08 CI result:** recorded with the next push's run below once observed.
+
+### S-09 — audit timeline UI (commit: this milestone's)
+
+The admin-only audit endpoint now has an interface:
+
+- New page `frontend/src/pages/AuditPage.tsx` at route `/admin/audit`,
+  wrapped in `RequireRole allow={['administrator']}` and listed in the
+  AppShell nav (`Audit log`, administrator-only). It renders the existing
+  `GET /audit-events` endpoint — no backend changes were needed or made:
+  rows are sorted **newest first** client-side by id (so the guarantee holds
+  regardless of server ordering), **paginated** 10 per page with
+  Previous/Next + `Page X of Y` + a totals line, and **filterable by event
+  type** (a `<select>` whose options are derived from the returned events;
+  changing the filter resets to page 1, and a stale page number is clamped so
+  shrinking result sets can never strand the user on an empty page).
+- Columns: `#` (id), event type badge, message, user email. Error state
+  surfaces the API failure (`role="alert"`) instead of a fake empty
+  timeline; loading uses the shared Lottie loader.
+- Tests (`frontend/src/pages/AuditPage.test.tsx`, 5): newest-first ordering
+  from an oldest-first payload + full pagination walk (1→2→3, remaining 5
+  rows, Next disabled at the end, Previous re-enables), filter
+  (`proposal_approved` → 8 of 25, `Page 1 of 1`, non-matching rows gone,
+  filter reset from a deep page), **campus operator and student each bounced
+  off `/admin/audit` with the `audit-events` fetch provably never issued**
+  (fetch stub call inspection), and the error-notice path.
+  The backend's own role gate (403 for non-administrators) is already
+  covered by `test_rbac.py::test_student_cannot_read_audit_log` /
+  `test_operator_cannot_read_audit_log`.
+
+Raw local gate output (frontend):
+
+```
+$ npm run lint
+> fairschedule-ai-frontend@0.1.0 lint
+> eslint .
+
+(0 errors; the same 3 pre-existing react-refresh warnings for
+CampusPage.tsx's exported-helper pattern)
+
+$ npm run test -- --run
+ Test Files  13 passed (13)
+      Tests  44 passed (44)
+
+$ npm run build
+✓ built in 6.97s
+```
+
+(39 after S-06 + 5 new AuditPage tests; main chunk still 1,557 kB with the
+>500 kB warning — S-11's mandate, not this item's.)
 
 ## Interim failures
 

@@ -4,6 +4,7 @@ import AppShell from './components/AppShell';
 import RequireRole from './components/RequireRole';
 import AdminUsersPage from './pages/AdminUsersPage';
 import AiPage from './pages/AiPage';
+import AuditPage from './pages/AuditPage';
 import CampusPage from './pages/CampusPage';
 import DashboardPage from './pages/DashboardPage';
 import LandingPage from './pages/LandingPage';
@@ -38,6 +39,10 @@ export default function App() {
           <Route
             path="/admin/users"
             element={<RequireRole allow={['administrator']}><AdminUsersPage /></RequireRole>}
+          />
+          <Route
+            path="/admin/audit"
+            element={<RequireRole allow={['administrator']}><AuditPage /></RequireRole>}
           />
         </Route>
 

@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/timetable', label: 'Timetable', allow: STAFF_ROLES },
   { to: '/rooms', label: 'Rooms', allow: STAFF_ROLES },
   { to: '/admin/users', label: 'Users', allow: ['administrator'] },
+  { to: '/admin/audit', label: 'Audit log', allow: ['administrator'] },
   { to: '/ai', label: 'AI assistant' },
 ];
 
