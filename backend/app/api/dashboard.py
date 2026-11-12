@@ -147,6 +147,10 @@ def list_student_groups(
 def my_schedule(
     current_user: User = Depends(get_current_user), session: Session = Depends(get_session)
 ) -> dict[str, Any]:
+    return build_schedule_payload(session, current_user)
+
+
+def build_schedule_payload(session: Session, current_user: User) -> dict[str, Any]:
     """Each role sees its own sessions: students their cohort, faculty their
     teaching, campus operators and administrators the whole institution.
 
@@ -154,6 +158,10 @@ def my_schedule(
     an administrator who happens to have a lecturer link still gets the
     institution view, and a faculty account without a link gets an explicit
     ``note`` instead of silently falling through to staff scope.
+
+    This is the single source of the R-007 scoping rules: ``GET /me/schedule``
+    and the ``GET /me/schedule.ics`` export (S-08) both serve exactly this
+    payload, so they cannot drift apart.
     """
     institution_id = current_user.institution_id
     bookings = session.exec(select(SessionBooking).where(SessionBooking.institution_id == institution_id)).all()

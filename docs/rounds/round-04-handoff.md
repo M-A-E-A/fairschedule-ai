@@ -18,8 +18,8 @@ verified; none may be reintroduced.
 | S-04 | Docker build + container smoke test in CI | done | `8cf3370` |
 | S-05 | 3D campus ↔ schedule integration | done | `fe90cfe` |
 | S-06 | Timetable publish workflow | done | `d2429a0` |
-| S-07 | CSV import | done | (this commit) |
-| S-08 | ICS calendar export | pending | — |
+| S-07 | CSV import | done | `29db218` |
+| S-08 | ICS calendar export | done | (this commit) |
 | S-09 | Audit timeline UI | pending | — |
 | S-10 | Solver metrics dashboard | pending | — |
 | S-11 | Route-level code splitting | pending | — |
@@ -413,6 +413,65 @@ $ python -m pytest -q
 (135 after S-06 + 13 new S-07 tests; the 1 warning is the known anyio
 `BlockingPortal` DeprecationWarning from starlette's TestClient, present
 since round 1.)
+
+**S-07 CI result (run `43302265537` on `29db218`, all four jobs green):**
+Backend (lint + test) 46s, Frontend (lint + test + build) 25s, Docker (build +
+container smoke test) 1m22s, Backend (PostgreSQL 16) 1m19s. Run URL:
+https://github.com/M-A-E-A/fairschedule-ai/actions/runs/43302265537
+
+### S-08 — ICS calendar export (commit: this milestone's)
+
+`GET /me/schedule.ics` now serves the caller's own schedule as a downloadable
+calendar:
+
+- New module `app/api/calendar.py`. Events are built from
+  `build_schedule_payload()` — the function `GET /me/schedule` itself serves,
+  extracted from it in this milestone — so the JSON view and the export share
+  **one** implementation of the R-007 role scoping (student → cohort, faculty
+  → own lectures, staff → institution; unlinked faculty → empty schedule) and
+  cannot drift.
+- Response is `text/calendar` with
+  `Content-Disposition: attachment; filename="schedule.ics"`.
+- Structure per RFC 5545: `BEGIN:VCALENDAR` / `VERSION:2.0` / `PRODID` /
+  `CALSCALE` / `METHOD:PUBLISH`, a self-contained `VTIMEZONE` for `Etc/UTC`,
+  and one `VEVENT` per session with `UID:fairschedule-{booking id}@fairschedule-ai`
+  (stable identity derived from the immutable booking id), `DTSTAMP`,
+  `SUMMARY`, `DESCRIPTION` (lecturer + cohort), and `LOCATION` (room).
+- **Timezone-explicit times:** naive wall-clock booking minutes are anchored
+  to Monday of the current UTC week and emitted as
+  `DTSTART;TZID=Etc/UTC:YYYYMMDDTHHMMSS` / `DTEND;TZID=…` — never floating
+  times — with the matching `VTIMEZONE` block in the same document.
+- **RFC 5545 TEXT escaping** (`escape_text`): backslash first, then `;`, `,`
+  and newlines → `\n`; **line folding** (`fold`): every physical line is
+  ≤ 75 octets with CRLF + space continuations, split on UTF-8 octet
+  boundaries so multi-byte characters never break.
+- Unauthenticated requests are rejected with 401 through the shared bearer
+  dependency (same as `/me/schedule`).
+- Tests (`backend/tests/test_ics_export.py`, 10): full structure assertions
+  (wrapper, CRLF endings, VTIMEZONE, 3 VEVENTs for the administrator,
+  per-event UID/DTSTAMP/TZID-qualified DTSTART/DTEND/SUMMARY, unique UIDs,
+  exact Monday date + 09:00/10:30 wall-clock round-trip, 75-octet line-limit
+  check), student cohort scoping (2 events, `DBS201` never exported, Tuesday
+  anchor), faculty own-lectures scoping (1 event), unlinked faculty → valid
+  but empty calendar, operator → whole institution, special-character
+  escaping end-to-end (a course named `Physics; I, Part \ Two\nEnd` inserted
+  directly then cleaned up in-test), unauthenticated 401, plus unit tests for
+  `escape_text`, `fold` (limit + reassembly, ASCII and multi-byte) and
+  `week_anchor`. A module-scoped fixture provisions the unlinked-faculty
+  account and removes every row the module adds, so no state leaks to later
+  modules.
+
+Raw local gate output (backend):
+
+```
+$ python -m ruff check .
+All checks passed!
+
+$ python -m pytest -q
+158 passed, 1 warning in 56.73s
+```
+
+(148 after S-07 + 10 new S-08 tests.)
 
 ## Interim failures
 
